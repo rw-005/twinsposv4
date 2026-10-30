@@ -369,6 +369,7 @@ function doLogin(){
  }
  S.user=st;S.shift=sh;S.cat='Semua';S.q='';S.view='pos';
  resetCart();renderMain();
+ try{syncAuto()}catch(_){}
 }
 
 /* ---------- promo & calc ---------- */
@@ -1236,7 +1237,7 @@ function prodForm(id){
   optCount('v');optCount('t');
  }
 }
-function delProd(id){if(confirm('Hapus produk ini?')){db.products=db.products.filter(p=>p.id!==id);save();setModal('produk')}}
+function delProd(id){if(confirm('Hapus produk ini?')){db.products=db.products.filter(p=>p.id!==id);syncDel('products',id);save();setModal('produk')}}
 function tplProd(){exportX('Template-Import-Produk',[{name:'Produk',rows:[['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'],['Es Kopi Susu','Minuman','gelas',18000,9000,100,'','Small:0; Regular:3000; Large:6000','Boba:3000; Cheese Foam:5000; Extra Shot:4000'],['Roti Coklat','Roti','pcs',8000,5000,50,'8991234567890','',''],['Beras Curah','Sembako','kg',13000,11000,100,'','','']]},{name:'Petunjuk',rows:[['PETUNJUK'],['Varian & Topping: pisahkan dengan titik koma (;). Format Nama:TambahanHarga. Contoh: Small:0; Large:5000'],['Tambahan harga = selisih dari Harga Jual (0 jika sama). Maksimal '+MAXOPT+' varian dan '+MAXOPT+' topping per produk.'],['Kosongkan kolom Varian/Topping jika tidak ada. Pada produk yang sudah ada, kolom kosong = varian/topping lama tidak diubah.']]}])}
 function parseCSV(txt){
  txt=txt.replace(/^﻿/,'').replace(/^sep=.\r?\n/i,'');
@@ -1319,9 +1320,13 @@ const SYN={
  tx:{h:['No Nota','Tanggal','Kasir','Tipe','Meja','Pelanggan','Subtotal','Diskon Promo','Diskon Manual','Service','Pajak','Pembulatan','Total','Pembayaran','Status','Total Refund'],r:t=>[t.no,fmtDT(t.ts),t.cashier,typeLabel(t.type,t.channel),t.table||'',t.custName||'',t.subtotal,t.autoDisc,t.manualDisc,t.service,t.tax,t.rounding,t.total,t.payments.map(p=>METHODS[p.m]+' '+p.ap).join(' + '),stTxt(t),t.refunded||0]},
  refunds:{h:['No Refund','Tanggal','Nota Asal','Item','Nilai Barang','Total Refund','Metode','Alasan','Disetujui','Kasir'],r:r=>[r.no,fmtDT(r.ts),r.txNo,r.items.map(i=>i.name+' x'+fq(i.qty)).join(', '),r.gross,r.amount,METHODS[r.method],r.reason,r.by,r.cashier]},
  shifts:{h:['Kasir','Masuk','Pulang','Durasi (menit)','Modal Awal','Kas Seharusnya','Uang Fisik','Selisih'],r:s=>[s.name,fmtDT(s.openTs),s.closeTs?fmtDT(s.closeTs):'Berjalan',Math.round(((s.closeTs||Date.now())-s.openTs)/60000),s.modal,s.closeTs?s.expected:'',s.closeTs?s.counted:'',s.closeTs?s.diff:'']},
- cash:{h:['Tanggal','Jenis','Kategori','Nominal','Sumber','Catatan','Dicatat Oleh'],r:x=>[fmtDT(x.ts),x.type==='out'?'Pengeluaran':'Uang Masuk',x.cat,x.amount,x.src==='laci'?'Laci kas':'Di luar laci',x.note||'',x.by]}
+ cash:{h:['Tanggal','Jenis','Kategori','Nominal','Sumber','Catatan','Dicatat Oleh'],r:x=>[fmtDT(x.ts),x.type==='out'?'Pengeluaran':'Uang Masuk',x.cat,x.amount,x.src==='laci'?'Laci kas':'Di luar laci',x.note||'',x.by]},
+ products:{h:['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'],r:p=>[p.name,p.cat,p.unit,p.price,p.cogs,p.stock,p.barcode||'',fmtOpts(p.variants,'; '),fmtOpts(p.toppings,'; ')]}
 };
-const tsOf=(k,o)=>k==='shifts'?o.openTs:o.ts;
+/* produk: foto tidak dikirim (terlalu besar); stok tidak ikut memicu kirim ulang */
+function synJ(k,o){if(k!=='products')return JSON.stringify(o);const c={...o};delete c.photo;return JSON.stringify(c)}
+function synH(k,o){if(k!=='products')return hsh(JSON.stringify(o));const c={...o};delete c.photo;delete c.stock;delete c.base;return hsh(JSON.stringify(c))}
+const tsOf=(k,o)=>k==='shifts'?o.openTs:k==='products'?(o.upd||0):o.ts;
 function hsh(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return s.length+':'+h}
 function syOn(){return !!(SY.url&&SY.token)}
 function syStatus(m,bad){SY.msg=m;SY.bad=!!bad;const e=document.getElementById('sy_st');if(e){e.textContent=m;e.style.color=bad?'var(--bad)':'var(--mut)'}}
@@ -1331,7 +1336,7 @@ async function syncPush(){
  if(!syOn()||_syBusy||!navigator.onLine)return;_syBusy=true;
  try{
   const recs=[],hs={};
-  Object.keys(SYN).forEach(k=>(db[k]||[]).forEach(o=>{const j=JSON.stringify(o),h=hsh(j);if(SY.h[k+o.id]!==h){recs.push({t:k,id:o.id,ts:tsOf(k,o),row:SYN[k].r(o),j});hs[k+o.id]=h}}));
+  Object.keys(SYN).forEach(k=>(db[k]||[]).forEach(o=>{const j=synJ(k,o),h=synH(k,o);if(SY.h[k+o.id]!==h){recs.push({t:k,id:o.id,ts:tsOf(k,o),row:SYN[k].r(o),j});hs[k+o.id]=h}}));
   const dels=SY.del.slice();
   for(let i=0;i<recs.length||(i===0&&dels.length);i+=100){
    const part=recs.slice(i,i+100);
@@ -1356,13 +1361,16 @@ async function syncPull(){
     const l=loc.get(o.id);let take=!l;
     if(l&&k==='tx'&&(o.refunded||0)>(l.refunded||0))take=true;
     if(l&&k==='shifts'&&o.closeTs&&!l.closeTs)take=true;
+    if(l&&k==='products'&&(o.upd||0)>(l.upd||0))take=true;
     if(!take)return;
+    if(k==='products')o=Object.assign({},o,{photo:l?(l.photo||''):'',stock:l?l.stock:(+o.stock||0),base:l?l.base:o.base,variants:o.variants||[],toppings:o.toppings||[]});
     if(l)db[k][db[k].indexOf(l)]=o;else db[k].push(o);
-    SY.h[k+o.id]=hsh(JSON.stringify(o));n++;
+    SY.h[k+o.id]=synH(k,o);n++;
    });
    const gone=new Set(r.dels&&r.dels[k]||[]);if(gone.size)db[k]=db[k].filter(o=>!gone.has(o.id));
   });
   ['tx','refunds','shifts','cash'].forEach(k=>db[k].sort((a,b)=>tsOf(k,a)-tsOf(k,b)));
+  if(n&&S.user&&S.view==='pos'&&!document.querySelector('.modal,.mback,#modal.on')){try{renderCats();renderGrid()}catch(_){}}
   try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}
   SY.last=Date.now();sySave();syStatus('Data semua kasir dimuat '+fmtT(SY.last)+(n?' ('+n+' baru)':''));
   return true;
@@ -1383,6 +1391,9 @@ async function saveSync(){SY.url=$('#sy_u').value.trim();SY.token=$('#sy_t').val
 async function syncNow(){if(!syOn())return toast('Isi URL & token dulu');syStatus('Menyinkronkan…');await syncPush();if(!SY.bad)await syncPull();if(!SY.bad)toast('Sinkron berhasil')}
 window.addEventListener('online',syncSoon);
 setInterval(()=>{if(syOn()&&S.user)syncPush()},60000);
+async function syncAuto(){if(!syOn()||!S.user||!navigator.onLine||_syBusy)return;await syncPush();await syncPull()}
+setInterval(syncAuto,180000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()});
 
 /* cetak Bluetooth: banyak printer (Struk / Dapur / Bar / Checker) */
 (function(){
