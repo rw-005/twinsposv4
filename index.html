@@ -1601,6 +1601,233 @@ function goBack(){nav('pos')}
   if(S.user&&S.view!=='pos')nav('pos');
  });
 })();
+/* ===== TWINS POS: VARIAN, TOPPING, STOK OPSIONAL, TEMPLATE IMPORT =====
+   Tempel SELURUH isi file ini tepat DI ATAS baris terakhir `renderApp();`
+   (baris paling bawah di dalam <script> utama, sebelum </script>). */
+
+const MAXOPT=10;
+
+/* "Small:0; Large:5000" atau satu per baris -> [{name,price,cogs}] */
+function parseOpts(str,what){
+ const out=[],seen={};
+ const parts=String(str==null?'':str).split(/[\n;|]+/).map(s=>s.trim()).filter(Boolean);
+ if(parts.length>MAXOPT)return{err:'Maksimal '+MAXOPT+' '+what+' per produk (sekarang '+parts.length+')'};
+ for(const s of parts){
+  const a=s.split(':'),name=a[0].trim();
+  if(!name)return{err:'Nama '+what+' kosong: "'+s+'"'};
+  const price=(a[1]===undefined||a[1].trim()==='')?0:toNum(a[1]);
+  const cogs=(a[2]===undefined||a[2].trim()==='')?0:toNum(a[2]);
+  if(isNaN(price)||isNaN(cogs))return{err:'Harga '+what+' "'+name+'" tidak valid'};
+  const k=name.toLowerCase();
+  if(seen[k])return{err:'Nama '+what+' dobel: '+name};
+  seen[k]=1;
+  out.push({name:name,price:Math.round(price),cogs:Math.round(cogs)});
+ }
+ return{list:out};
+}
+function fmtOpts(list,sep){return(list||[]).map(o=>o.name+':'+o.price+(o.cogs?':'+o.cogs:'')).join(sep)}
+
+/* ---------- tambah ke keranjang ---------- */
+function addProduct(id){
+ const p=db.products.find(x=>x.id===id);if(!p)return;
+ if((p.variants||[]).length||(p.toppings||[]).length)return optModal(id);
+ addLine(p,null,[]);
+}
+function addLine(p,v,tops){
+ tops=tops||[];
+ const key=p.id+'|'+(v?v.name:'')+'|'+tops.map(t=>t.name).sort().join(',');
+ const used=sum(S.cart.filter(x=>x.pid===p.id),x=>x.qty);
+ if(!p.notrack&&used+1>p.stock){toast('Stok '+p.name+' tidak cukup');return}
+ const l=S.cart.find(x=>(x.key||x.pid+'||')===key);
+ if(l)l.qty=+(l.qty+1).toFixed(3);
+ else{
+  const base=p.price+(v?v.price:0)+sum(tops,t=>t.price);
+  const cg=p.cogs+(v?v.cogs:0)+sum(tops,t=>t.cogs);
+  S.cart.push({pid:p.id,key:key,name:p.name+(v?' ('+v.name+')':''),unit:p.unit,qty:1,price:mkPrice(base),cogs:cg,base:base,cat:p.cat,sent:0,
+   note:tops.length?'+ '+tops.map(t=>t.name).join(', '):'',manual:false});
+ }
+ renderCart();
+}
+function setQty(i,v){
+ let q=parseFloat(v);const l=S.cart[i],p=db.products.find(x=>x.id===l.pid);
+ if(!(q>0)){delLine(i);return}
+ if(p&&!p.notrack){
+  const other=sum(S.cart.filter((x,k)=>k!==i&&x.pid===l.pid),x=>x.qty);
+  const mx=Math.max(0,+(p.stock-other).toFixed(3));
+  if(q>mx){toast('Stok tersedia '+fq(p.stock));q=mx;if(!(q>0)){delLine(i);return}}
+ }
+ l.qty=q;renderCart();
+}
+
+/* ---------- pilih varian & topping ---------- */
+let OPS={id:'',v:-1,t:[]};
+function optModal(id){
+ const p=db.products.find(x=>x.id===id);if(!p)return;
+ OPS={id:id,v:(p.variants||[]).length?0:-1,t:[]};
+ optRender();
+}
+function optTog(i){const k=OPS.t.indexOf(i);if(k>=0)OPS.t.splice(k,1);else OPS.t.push(i);optRender()}
+function optPick(){
+ const p=db.products.find(x=>x.id===OPS.id);if(!p)return null;
+ const vs=p.variants||[],ts=p.toppings||[];
+ return{p:p,vs:vs,ts:ts,v:OPS.v>=0?vs[OPS.v]:null,sel:OPS.t.map(i=>ts[i]).filter(Boolean)};
+}
+function optRender(){
+ const o=optPick();if(!o)return;
+ const p=o.p,tot=p.price+(o.v?o.v.price:0)+sum(o.sel,t=>t.price);
+ const sg=n=>n?'<br><small>'+(n>0?'+':'-')+rp(Math.abs(n))+'</small>':'';
+ openModal(`<h3>${esc(p.name)}</h3><div class="mut">${rp(p.price)} /${esc(p.unit)}</div>
+ ${o.vs.length?`<label>Varian (pilih satu)</label><div class="seg w">${o.vs.map((x,i)=>`<button class="btn ${OPS.v===i?'on':''}" onclick="OPS.v=${i};optRender()">${esc(x.name)}${sg(x.price)}</button>`).join('')}</div>`:''}
+ ${o.ts.length?`<label>Topping (boleh lebih dari satu)</label><div class="seg w">${o.ts.map((x,i)=>`<button class="btn ${OPS.t.includes(i)?'on':''}" onclick="optTog(${i})">${esc(x.name)}${sg(x.price)}</button>`).join('')}</div>`:''}
+ <div class="sumbox"><div class="t"><span>Harga satuan</span><span>${rp(mkPrice(tot))}</span></div></div>
+ <div class="mrow"><button class="btn" onclick="closeModal()">Batal</button><button class="btn pri" onclick="optAdd()">Tambah ke Keranjang</button></div>`);
+}
+function optAdd(){
+ const o=optPick();if(!o)return;
+ closeModal();addLine(o.p,o.v,o.sel);
+}
+
+/* ---------- daftar produk di kasir ---------- */
+function renderGrid(){
+ const el=$('#grid');if(!el)return;
+ const q=S.q.trim().toLowerCase();
+ const list=db.products.filter(p=>(S.cat==='Semua'||p.cat===S.cat)&&(!q||p.name.toLowerCase().includes(q)||String(p.barcode||'').includes(q)));
+ el.innerHTML=list.length?list.map(p=>{
+  const nv=(p.variants||[]).length,nt=(p.toppings||[]).length;
+  const inf=[nv?nv+' varian':'',nt?nt+' topping':''].filter(Boolean).join(' · ');
+  const info=p.notrack?(inf||'&nbsp;'):('Stok '+fq(p.stock)+(inf?' · '+inf:''));
+  return`<button class="prod" onclick="addProduct('${p.id}')"><div class="ph">${p.photo?`<img src="${p.photo}" alt="">`:esc(p.name.slice(0,1).toUpperCase())}</div><div class="pb"><b>${esc(p.name)}</b><div class="pr">${rp(p.price)}<small> /${esc(p.unit)}</small></div><small class="stk ${!p.notrack&&p.stock<=0?'low':''}">${info}</small></div></button>`;
+ }).join(''):'<div class="empty" style="grid-column:1/-1">'+(db.products.length?'Produk tidak ditemukan':'Belum ada produk. Tambah di Pengaturan › Produk &amp; Stok, atau tunggu sinkron dari perangkat lain.')+'</div>';
+}
+
+/* ---------- struk: tampilkan topping / catatan ---------- */
+function receiptText(t){
+ const f=mkFmt(),{lr,c,hr,wrap}=f;
+ const L=[...head(f),lr('No',t.no),lr('Tgl',fmtT(t.ts)),lr('Kasir',t.cashier),lr('Tipe',typeLabel(t.type,t.channel))];
+ if(t.table)L.push(lr('Meja',t.table));
+ if(t.custName)L.push(lr('Pelanggan',t.custName));
+ L.push(hr);
+ t.items.forEach(i=>{L.push(...wrap(i.name));if(i.note)L.push(...wrap('  '+i.note));L.push(lr('  '+fq(i.qty)+' '+i.unit+' x '+num(i.price),num(i.qty*i.price)))});
+ L.push(hr,lr('Subtotal',num(t.subtotal)));
+ if(t.autoDisc)L.push(lr('Promo '+t.autoNames.join(','),'-'+num(t.autoDisc)));
+ if(t.manualDisc)L.push(lr('Diskon','-'+num(t.manualDisc)));
+ if(t.service)L.push(lr('Service '+t.svcPct+'%',num(t.service)));
+ if(t.tax)L.push(lr('Pajak '+t.taxPct+'%'+(t.taxIncl?' (incl)':''),num(t.tax)));
+ if(t.rounding)L.push(lr('Pembulatan',(t.rounding>0?'+':'-')+num(Math.abs(t.rounding))));
+ L.push(lr('TOTAL',num(t.total)),hr);
+ t.payments.forEach(p=>L.push(lr(METHODS[p.m],num(p.m==='tunai'?p.tend:p.ap))));
+ if(t.change)L.push(lr('Kembali',num(t.change)));
+ if(t.customer)L.push(lr('Kasbon a/n',t.customer.name),c('** KASBON - BELUM LUNAS **'));
+ const rf=db.refunds.filter(r=>r.txId===t.id);
+ if(rf.length){L.push(hr,c('RETUR / REFUND'));rf.forEach(r=>L.push(lr(r.no,'-'+num(r.amount)),lr('  '+METHODS[r.method],fmtH(r.ts))));L.push(lr('Total retur','-'+num(t.refunded)),lr('Nilai bersih',num(t.total-t.refunded)));
+  if(t.status==='void')L.push(c('*** REFUND PENUH ***'))}
+ L.push(hr,c(db.settings.footer),c('Powered by TWINS POS'));
+ return L.join('\n');
+}
+
+/* ---------- form produk: stok opsional + varian + topping ---------- */
+function prodForm(id){
+ const p=db.products.find(x=>x.id===id)||{name:'',cat:'',unit:'pcs',price:0,cogs:0,stock:0,barcode:'',photo:'',variants:[],toppings:[]};
+ window._ph=p.photo||'';
+ formModal(id?'Ubah Produk':'Produk Baru',[
+  {k:'photo',l:'Foto produk',t:'photo'},
+  {k:'name',l:'Nama item'},
+  {k:'cat',l:'Kategori'},
+  {k:'unit',l:'Satuan (pcs / porsi / gelas / kg / liter …)'},
+  {k:'price',l:'Harga jual (Rp)',t:'number'},
+  {k:'cogs',l:'Harga modal / COGS (Rp, boleh kosong)',t:'number'},
+  {k:'stock',l:'Stok (kosongkan jika stok tidak dihitung)',t:'number'},
+  {k:'barcode',l:'Kode barcode'},
+  {k:'vars',l:'Varian (maksimal 10)'},
+  {k:'tops',l:'Topping (maksimal 10)'}
+ ],{...p,photo:window._ph,stock:id?(p.notrack?'':p.stock):'',vars:'',tops:''},o=>{
+  if(!o.name.trim())return'Nama wajib diisi';
+  if(isNaN(o.price)||o.price<0)return'Harga jual wajib diisi (angka)';
+  const vs=parseOpts(o.vars,'varian');if(vs.err)return vs.err;
+  const ts=parseOpts(o.tops,'topping');if(ts.err)return ts.err;
+  const trk=!isNaN(o.stock),now=Date.now();
+  const val={photo:o.photo,name:o.name.trim(),cat:o.cat.trim()||'Umum',unit:o.unit.trim()||'pcs',price:o.price,cogs:isNaN(o.cogs)?0:o.cogs,stock:trk?o.stock:0,notrack:!trk,barcode:o.barcode,variants:vs.list,toppings:ts.list};
+  if(id){Object.assign(p,val);p.upd=now;p.base=p.stock}
+  else db.products.push({id:uid(),...val,upd:now,base:val.stock});
+ },()=>setModal('produk'));
+ /* ubah isian varian/topping jadi kotak teks beberapa baris */
+ [['vars','Small:0\nLarge:5000',p.variants],['tops','Boba:3000\nKeju:2000',p.toppings]].forEach(([k,ph,list])=>{
+  const el=$('#f_'+k);if(!el)return;
+  const ta=document.createElement('textarea');
+  ta.id='f_'+k;ta.rows=5;
+  ta.placeholder='Satu per baris, format Nama:Tambahan harga\nContoh:\n'+ph;
+  ta.value=fmtOpts(list||[],'\n');
+  el.replaceWith(ta);
+  const h=document.createElement('div');
+  h.className='mut';h.style.cssText='font-size:12.5px;margin-top:4px';
+  h.textContent='Tambahan harga = selisih dari harga jual (isi 0 jika sama). Kosongkan jika tidak ada.';
+  ta.after(h);
+ });
+}
+
+/* tampilan daftar produk di Pengaturan */
+const _setModalV=setModal;
+setModal=function(tab){_setModalV(tab);if(tab==='produk')fixProdList()};
+function fixProdList(){
+ const rows=document.querySelectorAll('#plist .lrow');
+ db.products.forEach((p,i)=>{
+  const r=rows[i];if(!r)return;
+  const sm=r.querySelector('.lval small');
+  if(sm)sm.innerHTML='modal '+rp(p.cogs)+' · '+(p.notrack?'tanpa stok':(p.stock<=0?'<span style="color:var(--bad)">habis</span>':'stok '+fq(p.stock)));
+  const nv=(p.variants||[]).length,nt=(p.toppings||[]).length;
+  if(nv||nt){const m=r.querySelector('.lmain .mut');if(m)m.innerHTML+=' · '+[nv?nv+' varian':'',nt?nt+' topping':''].filter(Boolean).join(', ')}
+ });
+}
+
+/* ---------- ekspor, template, import ---------- */
+const PROD_HEAD=['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'];
+window._sheets_stok=()=>({label:'Stok',name:'Produk',rows:[PROD_HEAD,...db.products.map(p=>[p.name,p.cat,p.unit,p.price,p.cogs,p.notrack?'':p.stock,p.barcode||'',fmtOpts(p.variants,'; '),fmtOpts(p.toppings,'; ')])]});
+const _sheetDefsV=sheetDefs;
+sheetDefs=function(d){
+ const r=_sheetDefsV(d),i=r.findIndex(s=>s.label==='Stok');
+ if(i>=0)r[i]={label:'Stok',name:'Stok',rows:[['Produk','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Nilai Stok (modal)','Barcode','Varian','Topping'],...db.products.map(p=>[p.name,p.cat,p.unit,p.price,p.cogs,p.notrack?'Tanpa stok':p.stock,p.notrack?'':Math.round(p.stock*p.cogs),p.barcode||'',fmtOpts(p.variants,'; '),fmtOpts(p.toppings,'; ')])]};
+ return r;
+};
+function tplProd(){
+ exportX('Template-Import-Produk',[
+  {name:'Produk',rows:[PROD_HEAD,
+   ['Es Kopi Susu','Minuman','gelas',18000,9000,'','','Small:0; Regular:3000; Large:6000','Boba:3000; Cheese Foam:5000; Extra Shot:4000'],
+   ['Nasi Goreng','Makanan','porsi',20000,11000,'','','Biasa:0; Pedas:0; Spesial:5000','Telur:3000; Sosis:4000'],
+   ['Roti Coklat','Roti','pcs',8000,5000,50,'8991234567890','',''],
+   ['Beras Curah','Sembako','kg',13000,11000,100,'','','']]},
+  {name:'Petunjuk',rows:[
+   ['PETUNJUK PENGISIAN'],
+   ['1. Isi sheet Produk (hapus baris contoh), simpan, lalu Import di Pengaturan > Produk & Stok.'],
+   ['2. Wajib diisi: Nama, Harga Jual. Kategori kosong = Umum. Satuan kosong = pcs.'],
+   ['3. Stok: KOSONGKAN jika stok tidak dihitung. Isi angka jika ingin stok berkurang otomatis saat terjual.'],
+   ['4. Varian (maksimal 10): pisahkan dengan titik koma (;). Format Nama:TambahanHarga. Contoh: Small:0; Large:5000'],
+   ['5. Topping (maksimal 10): format sama. Contoh: Boba:3000; Keju:2000'],
+   ['6. Tambahan harga = selisih dari Harga Jual. Isi 0 jika harganya sama. Tambahan modal (opsional): Nama:Harga:Modal'],
+   ['7. Varian dipilih satu per pesanan, topping boleh lebih dari satu.'],
+   ['8. Produk yang sudah ada (barcode atau nama sama) diperbarui, bukan dobel.'],
+   ['9. Kolom Varian/Topping dikosongkan pada produk yang sudah ada = varian/topping lamanya tidak diubah.']]}
+ ]);
+}
+function applyImport(rows){
+ const al={name:['nama','name','produk','item','namaproduk','namaitem'],cat:['kategori','category','kelompok'],unit:['satuan','unit'],price:['hargajual','harga','price','hargajualrp','jual'],cogs:['hargamodal','modal','cogs','hpp'],stock:['stok','stock','qty','jumlah'],barcode:['barcode','kode','kodebarang','sku'],vars:['varian','variant','varianproduk','ukuran'],tops:['topping','toping','tambahan','addon']};
+ let add=0,upd=0,skip=0,bad=0;const now=Date.now();
+ rows.forEach(r=>{
+  const m={};Object.keys(r).forEach(k=>{m[String(k).toLowerCase().replace(/[^a-z]/g,'')]=r[k]});
+  const g=f=>{for(const a of al[f]){if(m[a]!==undefined&&m[a]!=='')return m[a]}return''};
+  const name=String(g('name')).trim();if(!name){skip++;return}
+  const sv=g('stock'),sn=sv===''?NaN:toNum(sv);
+  const o={name:name,cat:String(g('cat')).trim()||'Umum',unit:String(g('unit')).trim()||'pcs',price:toNum(g('price')),cogs:toNum(g('cogs')),stock:isNaN(sn)?0:sn,notrack:isNaN(sn),barcode:String(g('barcode')).trim()};
+  if(isNaN(o.price))o.price=0;if(isNaN(o.cogs))o.cogs=0;
+  const vr=String(g('vars')).trim(),tp=String(g('tops')).trim();
+  if(vr){const pv=parseOpts(vr,'varian');if(pv.err)bad++;else o.variants=pv.list}
+  if(tp){const pt=parseOpts(tp,'topping');if(pt.err)bad++;else o.toppings=pt.list}
+  const ex=db.products.find(p=>(o.barcode&&p.barcode===o.barcode)||p.name.toLowerCase()===name.toLowerCase());
+  if(ex){Object.assign(ex,o);ex.upd=now;ex.base=ex.stock;upd++}
+  else{db.products.push({id:uid(),photo:'',variants:[],toppings:[],...o,upd:now,base:o.stock});add++}
+ });
+ save();setModal('produk');
+ toast('Import selesai: '+add+' baru, '+upd+' diperbarui, '+skip+' dilewati'+(bad?', '+bad+' varian/topping tidak valid diabaikan':''));
+}
 renderApp();
 </script>
 <script>if("serviceWorker" in navigator&&location.protocol==="https:"){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}</script>
