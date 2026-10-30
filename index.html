@@ -1316,6 +1316,8 @@ function delStaff(id){
 const SYK='twinspos_sync';
 const SY=(()=>{let o={};try{o=JSON.parse(localStorage.getItem(SYK))||{}}catch(e){}o.dev=o.dev||uid();o.h=o.h||{};o.del=o.del||[];return o})();
 function sySave(){try{localStorage.setItem(SYK,JSON.stringify(SY))}catch(e){}}
+/* sekali saja: kirim ulang semua produk ke Google Sheet (sheet Produk dibuat ulang oleh Code.gs baru) */
+if(SY.pv!==3){Object.keys(SY.h).forEach(k=>{if(k.indexOf('products')===0)delete SY.h[k]});SY.pv=3;sySave()}
 const SYN={
  tx:{h:['No Nota','Tanggal','Kasir','Tipe','Meja','Pelanggan','Subtotal','Diskon Promo','Diskon Manual','Service','Pajak','Pembulatan','Total','Pembayaran','Status','Total Refund'],r:t=>[t.no,fmtDT(t.ts),t.cashier,typeLabel(t.type,t.channel),t.table||'',t.custName||'',t.subtotal,t.autoDisc,t.manualDisc,t.service,t.tax,t.rounding,t.total,t.payments.map(p=>METHODS[p.m]+' '+p.ap).join(' + '),stTxt(t),t.refunded||0]},
  refunds:{h:['No Refund','Tanggal','Nota Asal','Item','Nilai Barang','Total Refund','Metode','Alasan','Disetujui','Kasir'],r:r=>[r.no,fmtDT(r.ts),r.txNo,r.items.map(i=>i.name+' x'+fq(i.qty)).join(', '),r.gross,r.amount,METHODS[r.method],r.reason,r.by,r.cashier]},
@@ -1384,7 +1386,7 @@ async function openReport(){
 function syncCard(){
  return card('Sinkron Google Sheet','Semua kasir/perangkat dikirim ke satu Google Sheet. Laporan Owner menarik data gabungan dari sana.',
  `<div class="fg">${fld('URL Web App (Apps Script)',`<input id="sy_u" value="${esc(SY.url||'')}" placeholder="https://script.google.com/macros/s/.../exec">`,1)}${fld('Token rahasia (sama dengan di Code.gs)',`<input id="sy_t" value="${esc(SY.token||'')}">`,1)}</div>
- <div class="mut" style="font-size:12px">Versi sinkron produk: v2</div><div id="sy_st" class="mut" style="margin:10px 0;font-size:13.5px">${esc(SY.msg||(syOn()?'Aktif':'Belum diatur — data hanya tersimpan di perangkat ini'))}</div>
+ <div class="mut" style="font-size:12px">Versi sinkron produk: v3</div><div id="sy_st" class="mut" style="margin:10px 0;font-size:13.5px">${esc(SY.msg||(syOn()?'Aktif':'Belum diatur — data hanya tersimpan di perangkat ini'))}</div>
  <div class="quick"><button class="btn pri" onclick="saveSync()">Simpan &amp; Tes</button><button class="btn" onclick="syncNow()">Sinkronkan sekarang</button></div>`);
 }
 async function saveSync(){SY.url=$('#sy_u').value.trim();SY.token=$('#sy_t').value.trim();sySave();if(!syOn()){syStatus('Dinonaktifkan');return}syStatus('Menguji koneksi…');await syncNow()}
