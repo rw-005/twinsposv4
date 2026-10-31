@@ -249,6 +249,54 @@ th{color:var(--mut);font-size:12.5px;text-transform:uppercase;letter-spacing:.04
 .optg .btn{flex-direction:column;gap:2px;min-width:0;min-height:54px;padding:8px 6px;text-align:center;line-height:1.2;overflow-wrap:anywhere}
 .optg .btn small{font-weight:500;opacity:.8;font-size:12.5px}
 </style>
+<style id="v3">
+/* ---- kartu produk ---- */
+.grid:not(.tg){grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px;align-items:stretch}
+.prod{position:relative;display:flex;flex-direction:column;align-items:stretch;min-width:0}
+.prod .ph{position:relative;aspect-ratio:16/10;width:100%;font-size:34px;letter-spacing:.03em;flex-shrink:0}
+.prod .pb{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.prod .pb b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:39px;word-break:break-word}
+.prod .pr{margin-top:auto;white-space:nowrap}
+.prod.sel{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri),var(--sh)}
+.stb{position:absolute;left:8px;bottom:8px;background:rgba(11,22,48,.74);color:#fff;font-size:12px;font-weight:700;line-height:1.2;padding:3px 10px;border-radius:99px;font-family:inherit;letter-spacing:0;z-index:1}
+.stb.low{background:var(--bad)}
+.qbadge{position:absolute;right:8px;top:8px;min-width:30px;height:30px;padding:0 9px;border-radius:99px;background:var(--pri);color:#fff;font-weight:800;font-size:15px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 3px 10px rgba(36,87,245,.45);z-index:3;animation:qpop .18s ease-out}
+@keyframes qpop{from{transform:scale(.4)}to{transform:scale(1)}}
+@media (max-width:800px) and (orientation:portrait){
+ .grid:not(.tg){grid-template-columns:1fr;gap:8px}
+ .prod{flex-direction:row;align-items:center;gap:12px;padding:8px 12px}
+ .prod .ph{width:64px;height:64px;aspect-ratio:auto;font-size:22px;border-radius:12px;overflow:hidden}
+ .prod .stb{left:0;right:0;bottom:0;border-radius:0;text-align:center;font-size:10px;padding:2px 0}
+ .prod .qbadge{top:50%;right:12px;transform:translateY(-50%);animation:none}
+ .prod .pb{padding:0 44px 0 0}
+ .prod .pb b{min-height:0;font-size:16.5px}
+}
+@media (orientation:landscape) and (max-height:520px){
+ .grid:not(.tg){grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:8px}
+ .prod .ph{font-size:22px}
+ .stb{font-size:10.5px;padding:2px 7px;left:5px;bottom:5px}
+ .qbadge{min-width:24px;height:24px;font-size:13px;right:5px;top:5px}
+}
+/* ---- riwayat transaksi ---- */
+.hsum{grid-template-columns:1fr 1fr;margin-bottom:12px}
+.hx{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(20,40,100,.04)}
+.hx-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.hx-no{font-weight:800;font-size:16.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hx-meta{color:var(--mut);font-size:13px;margin-top:3px;line-height:1.4}
+.hx-amt{text-align:right;flex-shrink:0}.hx-amt b{font-size:20px;font-weight:800;display:block}.hx-amt small{color:var(--bad);font-weight:600}
+.hx-items{margin:10px 0;padding:9px 12px;background:var(--soft);border-radius:12px;font-size:13.5px;line-height:1.4}
+.hx-bot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.hx-tags{display:flex;gap:6px;flex-wrap:wrap}
+.hx-acts{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+@media (max-width:800px) and (orientation:portrait){.hx-acts{width:100%;margin-left:0}.hx-acts .btn{flex:1}.hx-top{flex-direction:column;gap:6px}.hx-amt{text-align:left}}
+/* ---- status printer di header ---- */
+#btBtn{display:none!important}
+.prn{width:auto;padding:0 16px;gap:9px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;white-space:nowrap}
+.prn .pdot{width:11px;height:11px;border-radius:50%;background:#9aa3b5;box-shadow:0 0 0 2px rgba(255,255,255,.55);flex-shrink:0}
+.prn.g .pdot{background:#2ee07a}.prn.o .pdot{background:#ffcf40}.prn.r .pdot{background:#ff5d6e}
+@media (max-width:800px) and (orientation:portrait){.prn{width:46px;padding:0;position:relative}.prn .tx{display:none}.prn .pdot{position:absolute;right:6px;top:6px;width:10px;height:10px}}
+@media (orientation:landscape) and (max-height:520px){header .prn{width:auto;padding:0 12px;min-height:42px;height:42px;font-size:12.5px}}
+</style>
 </head>
 <body>
 <div id="app"></div>
@@ -338,6 +386,7 @@ const fmtDT=ts=>{const d=new Date(ts);return d.getFullYear()+'-'+p2(d.getMonth()
 const dur=ms=>{const m=Math.max(0,Math.round(ms/60000));return Math.floor(m/60)+'j '+(m%60)+'m'};
 function normWA(n){n=String(n||'').replace(/\D/g,'');if(n.startsWith('0'))n='62'+n.slice(1);return n}
 const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
+const ini=n=>{const w=String(n||'').trim().split(/\s+/).filter(Boolean);if(!w.length)return'?';return(w.length>1?Array.from(w[0])[0]+Array.from(w[1])[0]:Array.from(w[0]).slice(0,2).join('')).toUpperCase()};
 
 /* ---------- lock ---------- */
 function renderApp(){document.documentElement.dataset.theme=db.theme;S.user?renderMain():renderLock()}
@@ -404,7 +453,7 @@ function hlHTML(){return `<b>${esc(db.settings.name)}</b>${esc(S.user.name)} · 
 function renderMain(){
  $('#app').innerHTML=`<div class="shell">
  <div class="topbar"><header><div style="display:flex;align-items:center;gap:8px;min-width:0"><button class="ib bkb" id="bkb" onclick="goBack()" aria-label="Kembali">${ic('back',22)}</button><div class="hl" id="hlt">${hlHTML()}</div></div><div class="logo sm">TWINS<span>POS</span></div>
-  <div class="hr"><button class="ib" id="thb" onclick="toggleTheme()">${ic(db.theme==='dark'?'sun':'moon',20)}</button>
+  <div class="hr"><button class="ib prn" id="prnSt" onclick="setModal('perangkat')" title="Status printer"><span class="pdot"></span>${ic('printer',20)}<span class="tx">Printer</span></button><button class="ib" id="thb" onclick="toggleTheme()">${ic(db.theme==='dark'?'sun':'moon',20)}</button>
   <button class="btn sm bad" onclick="closeShiftModal()">${ic('power',19)}<span class="tx">Tutup Kasir</span></button></div></header>
  <nav class="nav" id="nav"></nav></div>
  <div class="main"><section class="left" id="left"></section>
@@ -420,6 +469,7 @@ function renderMain(){
   </aside></div></div>`;
  $('#mt').value=S.manual.type;$('#mv').value=S.manual.val||'';
  renderNav();renderLeft();renderCart();
+ try{BT.paint()}catch(_){}
 }
 setInterval(()=>{if(S.user){renderPromo();renderTotals()}},30000);
 function renderNav(){
@@ -465,7 +515,10 @@ function renderGrid(){
  const el=$('#grid');if(!el)return;
  const q=S.q.trim().toLowerCase();
  const list=db.products.filter(p=>(S.cat==='Semua'||p.cat===S.cat)&&(!q||p.name.toLowerCase().includes(q)||String(p.barcode||'').includes(q)));
- el.innerHTML=list.length?list.map(p=>`<button class="prod" onclick="addProduct('${p.id}')"><div class="ph">${p.photo?`<img src="${p.photo}" alt="">`:esc(p.name.slice(0,1).toUpperCase())}</div><div class="pb"><b>${esc(p.name)}</b><div class="pr">${rp(p.price)}<small> /${esc(p.unit)}</small></div><small class="stk ${p.stock<=0?'low':''}">Stok ${fq(p.stock)}${optInfo(p)}</small></div></button>`).join(''):'<div class="empty" style="grid-column:1/-1">Produk tidak ditemukan</div>';
+ el.innerHTML=list.length?list.map(p=>{
+  const n=sum(S.cart.filter(x=>x.pid===p.id),x=>x.qty);
+  const stk=p.notrack?'':`<span class="stb ${p.stock<=0?'low':''}">${p.stock<=0?'Habis':'Stok '+fq(p.stock)}</span>`;
+  return `<button class="prod ${n>0?'sel':''}" onclick="addProduct('${p.id}')">${n>0?`<span class="qbadge">${fq(n)}</span>`:''}<div class="ph">${p.photo?`<img src="${p.photo}" alt="">`:esc(ini(p.name))}${stk}</div><div class="pb"><b>${esc(p.name)}</b><div class="pr">${rp(p.price)}<small> /${esc(p.unit)}</small>${optInfo(p)?`<small>${optInfo(p)}</small>`:''}</div></div></button>`}).join(''):'<div class="empty" style="grid-column:1/-1">Produk tidak ditemukan</div>';
 }
 function scanEnter(){
  const q=S.q.trim();if(!q)return;
@@ -513,6 +566,7 @@ function renderCart(){
   <div class="lq"><button class="qb" onclick="stepQty(${i},-1)">−</button><input type="number" inputmode="decimal" step="any" min="0" value="${l.qty}" onchange="setQty(${i},this.value)"><button class="qb" onclick="stepQty(${i},1)">+</button></div>
   <div class="ls">${rp(l.qty*l.price)}<button class="x" onclick="delLine(${i})">${ic('x',15)}</button></div></div>`).join(''):`<div class="empty">${ic('cart',34)}<div>Keranjang kosong</div></div>`;
  renderTotals();
+ if($('#grid'))renderGrid();
 }
 function renderTotals(){
  if(!$('#tot'))return;
@@ -713,7 +767,7 @@ function finalize(){
   items:items.map(l=>({pid:l.pid,name:l.name,unit:l.unit,qty:l.qty,price:l.price,cogs:l.cogs,refQty:0,base:l.base,note:l.note||'',cat:l.cat||catOf(l.pid)})),
   subtotal:c.sub,autoDisc:c.auto,autoNames:c.names,manualDisc:c.man,net:c.net,service:c.svc,svcPct:c.svcPct,tax:c.tax,taxPct:c.taxPct,taxIncl:c.taxIncl,rounding:c.rounding,total:c.total,
   payments:CK.pays.map(p=>({...p})),change,customer:kb?{name:CK.name.trim(),wa:CK.wa.trim()}:null,status:'ok',refunded:0};
- t.items.forEach(i=>{const p=db.products.find(x=>x.id===i.pid);if(p)p.stock=+(p.stock-i.qty).toFixed(3)});
+ t.items.forEach(i=>{const p=db.products.find(x=>x.id===i.pid);if(p&&!p.notrack)p.stock=+(p.stock-i.qty).toFixed(3)});
  db.tx.push(t);
  const kl=[];S.cart.forEach((l,i)=>{const q=CK.mode==='items'?(CK.sel[i]||0):l.qty;if(q>0){const un=+(q-(l.sent||0)).toFixed(3);if(un>0)kl.push({...l,qty:un});l.sent=Math.max(0,+((l.sent||0)-q).toFixed(3))}});
  const kctx={type:S.type,channel:S.channel,table:S.table,cust:S.cust,by:S.user.name,no:t.no};
@@ -943,9 +997,14 @@ function exportHist(){
 }
 function histList(){
  const all=histFiltered(),l=all.slice(0,100);
- $('#hs').innerHTML=`<div class="mut" style="margin:6px 2px 12px">${all.length} transaksi · total ${rp(sum(all,t=>t.total))}${all.length>100?' · menampilkan 100 terbaru':''}</div>`;
- $('#hl').innerHTML=l.length?l.map(t=>{const rf=db.refunds.filter(r=>r.txId===t.id);return`<div class="trow"><div><div class="tno">${esc(t.no)} ${stBadge(t)}</div><div class="mut" style="font-size:13px;margin:4px 0 8px">${fmtT(t.ts)} · ${esc(t.cashier)}${t.table?' · '+esc(t.table):''}${t.custName?' · '+esc(t.custName):''}</div><span class="badge">${esc(typeLabel(t.type,t.channel))}</span> ${t.payments.map(p=>`<span class="badge ${p.m==='kasbon'?'k':''}">${METHODS[p.m]}</span>`).join(' ')}</div>
- <div class="tr"><div><div class="amt">${rp(t.total)}</div>${t.refunded?`<small style="color:var(--bad)">refund -${rp(t.refunded)}</small>`:''}</div><div class="acts"><button class="btn sm" onclick="receiptModal(db.tx.find(x=>x.id==='${t.id}'))">${ic('file',14)} Struk</button>${rf.map(r=>`<button class="btn sm" onclick="refundReceipt('${r.id}')">${esc(r.no)}</button>`).join('')}${t.status!=='void'?`<button class="btn sm bad" onclick="refundModal('${t.id}')">${ic('undo',14)} Refund</button>`:''}</div></div></div>`}).join(''):`<div class="empty">${ic('clock',38)}<div>Tidak ada transaksi pada filter ini</div></div>`;
+ $('#hs').innerHTML=`<div class="kgrid hsum"><div class="kc"><small>Jumlah transaksi</small><b>${all.length}</b></div><div class="kc"><small>Total penjualan</small><b>${rp(sum(all,t=>t.total))}</b></div></div>${all.length>100?'<div class="mut" style="margin:0 2px 10px;font-size:13px">Menampilkan 100 terbaru</div>':''}`;
+ $('#hl').innerHTML=l.length?l.map(t=>{
+  const rf=db.refunds.filter(r=>r.txId===t.id);
+  const ctx=[t.table,t.custName].filter(Boolean).map(esc).join(' · ');
+  const its=t.items.slice(0,3).map(i=>esc(i.name)+' ×'+fq(i.qty)).join(', ')+(t.items.length>3?' +'+(t.items.length-3)+' lainnya':'');
+  return `<div class="hx"><div class="hx-top"><div><div class="hx-no">${esc(t.no)} ${stBadge(t)}</div><div class="hx-meta">${fmtT(t.ts)} · ${esc(t.cashier)}${ctx?' · '+ctx:''}</div></div><div class="hx-amt"><b>${rp(t.total)}</b>${t.refunded?`<small>refund -${rp(t.refunded)}</small>`:''}</div></div>
+  <div class="hx-items">${its}</div>
+  <div class="hx-bot"><div class="hx-tags"><span class="badge">${esc(typeLabel(t.type,t.channel))}</span>${t.payments.map(p=>`<span class="badge ${p.m==='kasbon'?'k':''}">${METHODS[p.m]}</span>`).join('')}</div><div class="hx-acts"><button class="btn sm" onclick="receiptModal(db.tx.find(x=>x.id==='${t.id}'))">${ic('file',14)} Struk</button>${rf.map(r=>`<button class="btn sm" onclick="refundReceipt('${r.id}')">${esc(r.no)}</button>`).join('')}${t.status!=='void'?`<button class="btn sm bad" onclick="refundModal('${t.id}')">${ic('undo',14)} Refund</button>`:''}</div></div></div>`}).join(''):`<div class="empty">${ic('clock',38)}<div>Tidak ada transaksi pada filter ini</div></div>`;
 }
 let RF={};
 function refundModal(id,keep){
@@ -980,7 +1039,7 @@ function commitRefund(t,sv){
  const r={id:uid(),no:'RF-'+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'-'+String(db.rseq).padStart(4,'0'),ts:Date.now(),txId:t.id,txNo:t.no,cashier:S.user.name,by:sv.name,shiftId:S.shift.id,
   items:a.lines.map(x=>({pid:x.i.pid,name:x.i.name,unit:x.i.unit,qty:x.q,price:x.i.price,cogs:x.i.cogs})),gross:Math.round(a.gross),amount:a.amt,
   net:Math.round(t.net*ratioT),service:Math.round(t.service*ratioT),tax:Math.round(t.tax*ratioT),method:RF.method,reason:RF.reason.trim()};
- a.lines.forEach(x=>{x.i.refQty=+((x.i.refQty||0)+x.q).toFixed(3);const p=db.products.find(z=>z.id===x.i.pid);if(p)p.stock=+(p.stock+x.q).toFixed(3)});
+ a.lines.forEach(x=>{x.i.refQty=+((x.i.refQty||0)+x.q).toFixed(3);const p=db.products.find(z=>z.id===x.i.pid);if(p&&!p.notrack)p.stock=+(p.stock+x.q).toFixed(3)});
  t.refunded=(t.refunded||0)+a.amt;
  t.status=t.items.every(i=>(i.refQty||0)>=i.qty-0.0004)?'void':'partial';
  db.refunds.push(r);save();renderGrid();toast('Refund disetujui oleh '+sv.name+'. Stok dikembalikan.');
@@ -1079,7 +1138,7 @@ function sheetDefs(d){
  {label:'Refund',name:'Refund',rows:[['No Refund','Tanggal','Nota Asal','Item','Nilai Barang','Total Refund','Metode','Alasan','Disetujui','Kasir'],...d.rf.map(r=>[r.no,fmtDT(r.ts),r.txNo,r.items.map(i=>i.name+' x'+fq(i.qty)).join(', '),r.gross,r.amount,METHODS[r.method],r.reason,r.by,r.cashier])]},
  {label:'Shift & Presensi',name:'Shift',rows:[['Staf','Masuk','Pulang','Durasi (menit)','Modal Awal','Kas Seharusnya','Uang Fisik','Selisih'],...d.sh.map(s=>[s.name,fmtDT(s.openTs),s.closeTs?fmtDT(s.closeTs):'Berjalan',Math.round(((s.closeTs||Date.now())-s.openTs)/60000),s.modal,s.closeTs?s.expected:'',s.closeTs?s.counted:'',s.closeTs?s.diff:''])]},
  {label:'Kasbon',name:'Kasbon',rows:[['No Nota','Tanggal','Nama','WhatsApp','Nominal Kasbon'],...d.tx.filter(t=>t.customer).map(t=>[t.no,fmtDT(t.ts),t.customer.name,t.customer.wa,sum(t.payments.filter(p=>p.m==='kasbon'),p=>p.ap)])]},
- {label:'Stok',name:'Stok',rows:[['Produk','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Nilai Stok (modal)','Barcode','Varian','Topping'],...db.products.map(p=>[p.name,p.cat,p.unit,p.price,p.cogs,p.stock,Math.round(p.stock*p.cogs),p.barcode||'',fmtOpts(p.variants,'; '),fmtOpts(p.toppings,'; ')])]}
+ {label:'Stok',name:'Stok',rows:[['Produk','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Nilai Stok (modal)','Barcode','Varian','Topping'],...db.products.map(p=>[p.name,p.cat,p.unit,p.price,p.cogs,p.notrack?'':p.stock,p.notrack?'':Math.round(p.stock*p.cogs),p.barcode||'',fmtOpts(p.variants,'; '),fmtOpts(p.toppings,'; ')])]}
  ];
 }
 function dlBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},600)}
@@ -1157,7 +1216,7 @@ function setModal(tab){
  if(tab==='kas')body=card('Kategori Pengeluaran','Pisahkan dengan koma',`<textarea id="k_out" rows="3">${esc(st.cashCats.out.join(', '))}</textarea>`)+card('Kategori Uang Masuk','Pisahkan dengan koma',`<textarea id="k_in" rows="2">${esc(st.cashCats.in.join(', '))}</textarea>`)+sv('saveKas()');
  if(tab==='staff')body=card('Karyawan &amp; Peran','Atur akses dan PIN masing-masing staf',db.staff.map(s=>`<div class="lrow"><div class="avatar">${esc(s.name.slice(0,1).toUpperCase())}</div><div class="lmain"><b>${esc(s.name)}</b> <span class="badge ${s.role==='owner'?'g':s.role==='supervisor'?'k':''}">${ROLES[s.role]}</span></div><div class="lacts"><button class="btn sm" onclick="staffForm('${s.id}')">Ubah / PIN</button><button class="btn sm bad" onclick="delStaff('${s.id}')">${ic('trash',14)}</button></div></div>`).join(''),`<button class="btn pri sm" onclick="staffForm()">${ic('plus',14)} Tambah</button>`);
  if(tab==='produk')body=card('Daftar Produk','Kelola katalog, harga, stok, dan foto',`<div class="sbox" style="margin-bottom:12px">${ic('search',18)}<input placeholder="Cari produk…" oninput="filterRows(this.value)"></div><div class="quick" style="margin-bottom:6px"><button class="btn sm" onclick="$('#imp').click()">${ic('upload',14)} Import Excel/CSV</button><button class="btn sm" onclick="tplProd()">${ic('download',14)} Template</button><button class="btn sm" onclick="exportX('Produk',[window._sheets_stok()])">${ic('download',14)} Ekspor</button></div><input type="file" id="imp" accept=".xlsx,.xls,.csv" style="display:none" onchange="importProd(this.files[0]);this.value=''">
-  <div id="plist">${db.products.map(p=>`<div class="lrow" data-q="${esc((p.name+' '+p.cat+' '+(p.barcode||'')).toLowerCase())}"><div class="avatar">${p.photo?`<img src="${p.photo}">`:esc(p.name.slice(0,1).toUpperCase())}</div><div class="lmain"><b>${esc(p.name)}</b><div class="mut">${esc(p.cat)} · ${esc(p.unit)}${p.barcode?' · '+esc(p.barcode):''}${optInfo(p)}</div></div><div class="lval">${rp(p.price)}<small>modal ${rp(p.cogs)} · ${p.stock<=0?'<span style="color:var(--bad)">habis</span>':'stok '+fq(p.stock)}</small></div><div class="lacts"><button class="btn sm" onclick="prodForm('${p.id}')">Ubah</button><button class="btn sm bad" onclick="delProd('${p.id}')">${ic('trash',14)}</button></div></div>`).join('')}</div>`,`<button class="btn pri sm" onclick="prodForm()">${ic('plus',14)} Tambah</button>`);
+  <div id="plist">${db.products.map(p=>`<div class="lrow" data-q="${esc((p.name+' '+p.cat+' '+(p.barcode||'')).toLowerCase())}"><div class="avatar">${p.photo?`<img src="${p.photo}">`:esc(ini(p.name))}</div><div class="lmain"><b>${esc(p.name)}</b><div class="mut">${esc(p.cat)} · ${esc(p.unit)}${p.barcode?' · '+esc(p.barcode):''}${optInfo(p)}</div></div><div class="lval">${rp(p.price)}<small>modal ${rp(p.cogs)} · ${p.notrack?'tanpa stok':p.stock<=0?'<span style="color:var(--bad)">habis</span>':'stok '+fq(p.stock)}</small></div><div class="lacts"><button class="btn sm" onclick="prodForm('${p.id}')">Ubah</button><button class="btn sm bad" onclick="delProd('${p.id}')">${ic('trash',14)}</button></div></div>`).join('')}</div>`,`<button class="btn pri sm" onclick="prodForm()">${ic('plus',14)} Tambah</button>`);
  if(tab==='sync')body=syncCard();
  const nav=tabs.map(([k,l,i])=>`<button class="sn ${k===tab?'on':''}" onclick="setModal('${k}')">${ic(i,20)}<span>${l}</span></button>`).join('');
  panel('Pengaturan','Atur toko, pajak, printer, dan data master',`<div class="setgrid"><nav class="setnav">${nav}</nav><div class="setmain">${body}</div></div>`);
@@ -1220,13 +1279,14 @@ function pickPhoto(inp){
  img.src=url;
 }
 function prodForm(id){
- const p=db.products.find(x=>x.id===id)||{name:'',cat:'',unit:'pcs',price:0,cogs:0,stock:0,barcode:'',photo:'',variants:[],toppings:[]};
+ const p=db.products.find(x=>x.id===id)||{name:'',cat:'',unit:'pcs',price:0,cogs:0,stock:'',notrack:true,barcode:'',photo:'',variants:[],toppings:[]};
  window._ph=p.photo||'';
- formModal(id?'Ubah Produk':'Produk Baru',[{k:'photo',l:'Foto produk',t:'photo'},{k:'name',l:'Nama item'},{k:'cat',l:'Kategori'},{k:'unit',l:'Satuan (pcs / kg / liter / meter …)'},{k:'price',l:'Harga jual (Rp)',t:'number'},{k:'cogs',l:'Harga modal / COGS (Rp)',t:'number'},{k:'stock',l:'Stok',t:'number'},{k:'barcode',l:'Kode barcode'}],{...p,photo:window._ph},o=>{
+ formModal(id?'Ubah Produk':'Produk Baru',[{k:'photo',l:'Foto produk',t:'photo'},{k:'name',l:'Nama item'},{k:'cat',l:'Kategori'},{k:'unit',l:'Satuan (pcs / kg / liter / meter …)'},{k:'price',l:'Harga jual (Rp)',t:'number'},{k:'cogs',l:'Harga modal / COGS (Rp)',t:'number'},{k:'stock',l:'Stok (kosongkan jika tidak perlu dihitung)',t:'number'},{k:'barcode',l:'Kode barcode'}],{...p,photo:window._ph,stock:p.notrack?'':p.stock},o=>{
   if(!o.name.trim())return'Nama wajib diisi';
-  if(isNaN(o.price)||isNaN(o.cogs)||isNaN(o.stock))return'Harga dan stok harus berupa angka';
+  if(isNaN(o.price)||isNaN(o.cogs))return'Harga jual dan harga modal harus berupa angka';
   const vs=optRead('v','varian');if(vs.err){toast(vs.err);return vs.err}
   const ts=optRead('t','topping');if(ts.err){toast(ts.err);return ts.err}
+  o.notrack=isNaN(o.stock);if(o.notrack)o.stock=0;
   o.name=o.name.trim();o.cat=o.cat.trim()||'Umum';o.unit=o.unit.trim()||'pcs';o.variants=vs.list;o.toppings=ts.list;
   const now=Date.now();
   if(id){Object.assign(p,o);p.upd=now;p.base=p.stock}else db.products.push({id:uid(),...o,upd:now,base:o.stock});
@@ -1238,7 +1298,7 @@ function prodForm(id){
  }
 }
 function delProd(id){if(confirm('Hapus produk ini?')){db.products=db.products.filter(p=>p.id!==id);syncDel('products',id);save();setModal('produk')}}
-function tplProd(){exportX('Template-Import-Produk',[{name:'Produk',rows:[['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'],['Es Kopi Susu','Minuman','gelas',18000,9000,100,'','Small:0; Regular:3000; Large:6000','Boba:3000; Cheese Foam:5000; Extra Shot:4000'],['Roti Coklat','Roti','pcs',8000,5000,50,'8991234567890','',''],['Beras Curah','Sembako','kg',13000,11000,100,'','','']]},{name:'Petunjuk',rows:[['PETUNJUK'],['Varian & Topping: pisahkan dengan titik koma (;). Format Nama:TambahanHarga. Contoh: Small:0; Large:5000'],['Tambahan harga = selisih dari Harga Jual (0 jika sama). Maksimal '+MAXOPT+' varian dan '+MAXOPT+' topping per produk.'],['Kosongkan kolom Varian/Topping jika tidak ada. Pada produk yang sudah ada, kolom kosong = varian/topping lama tidak diubah.']]}])}
+function tplProd(){exportX('Template-Import-Produk',[{name:'Produk',rows:[['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'],['Es Kopi Susu','Minuman','gelas',18000,9000,100,'','Small:0; Regular:3000; Large:6000','Boba:3000; Cheese Foam:5000; Extra Shot:4000'],['Roti Coklat','Roti','pcs',8000,5000,50,'8991234567890','',''],['Beras Curah','Sembako','kg',13000,11000,100,'','','']]},{name:'Petunjuk',rows:[['PETUNJUK'],['Varian & Topping: pisahkan dengan titik koma (;). Format Nama:TambahanHarga. Contoh: Small:0; Large:5000'],['Tambahan harga = selisih dari Harga Jual (0 jika sama). Maksimal '+MAXOPT+' varian dan '+MAXOPT+' topping per produk.'],['Kolom Stok boleh dikosongkan: produk itu tidak dihitung stoknya (tidak pernah habis).'],['Kosongkan kolom Varian/Topping jika tidak ada. Pada produk yang sudah ada, kolom kosong = varian/topping lama tidak diubah.']]}])}
 function parseCSV(txt){
  txt=txt.replace(/^﻿/,'').replace(/^sep=.\r?\n/i,'');
  const first=txt.split(/\r?\n/)[0]||'',dl=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';
@@ -1279,7 +1339,7 @@ function applyImport(rows){
   const g=f=>{for(const a of al[f]){if(m[a]!==undefined&&m[a]!=='')return m[a]}return''};
   const name=String(g('name')).trim();if(!name){skip++;return}
   const o={name,cat:String(g('cat')).trim()||'Umum',unit:String(g('unit')).trim()||'pcs',price:toNum(g('price')),cogs:toNum(g('cogs')),stock:toNum(g('stock')),barcode:String(g('barcode')).trim()};
-  if(isNaN(o.price))o.price=0;if(isNaN(o.cogs))o.cogs=0;if(isNaN(o.stock))o.stock=0;
+  if(isNaN(o.price))o.price=0;if(isNaN(o.cogs))o.cogs=0;if(isNaN(o.stock)){o.stock=0;o.notrack=true}else o.notrack=false;
   const vr=String(g('vars')).trim(),tp=String(g('tops')).trim();
   if(vr){const pv=parseOpts(vr,'varian');if(pv.err)bad++;else o.variants=pv.list}
   if(tp){const pt=parseOpts(tp,'topping');if(pt.err)bad++;else o.toppings=pt.list}
@@ -1323,7 +1383,7 @@ const SYN={
  refunds:{h:['No Refund','Tanggal','Nota Asal','Item','Nilai Barang','Total Refund','Metode','Alasan','Disetujui','Kasir'],r:r=>[r.no,fmtDT(r.ts),r.txNo,r.items.map(i=>i.name+' x'+fq(i.qty)).join(', '),r.gross,r.amount,METHODS[r.method],r.reason,r.by,r.cashier]},
  shifts:{h:['Kasir','Masuk','Pulang','Durasi (menit)','Modal Awal','Kas Seharusnya','Uang Fisik','Selisih'],r:s=>[s.name,fmtDT(s.openTs),s.closeTs?fmtDT(s.closeTs):'Berjalan',Math.round(((s.closeTs||Date.now())-s.openTs)/60000),s.modal,s.closeTs?s.expected:'',s.closeTs?s.counted:'',s.closeTs?s.diff:'']},
  cash:{h:['Tanggal','Jenis','Kategori','Nominal','Sumber','Catatan','Dicatat Oleh'],r:x=>[fmtDT(x.ts),x.type==='out'?'Pengeluaran':'Uang Masuk',x.cat,x.amount,x.src==='laci'?'Laci kas':'Di luar laci',x.note||'',x.by]},
- products:{h:['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'],r:p=>[p.name,p.cat,p.unit,p.price,p.cogs,p.stock,p.barcode||'',fmtOpts(p.variants,'; '),fmtOpts(p.toppings,'; ')]}
+ products:{h:['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'],r:p=>[p.name,p.cat,p.unit,p.price,p.cogs,p.notrack?'':p.stock,p.barcode||'',fmtOpts(p.variants,'; '),fmtOpts(p.toppings,'; ')]}
 };
 /* produk: foto tidak dikirim (terlalu besar); stok tidak ikut memicu kirim ulang */
 function synJ(k,o){if(k!=='products')return JSON.stringify(o);const c={...o};delete c.photo;return JSON.stringify(c)}
@@ -1419,7 +1479,16 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
  const paint=()=>{
   const rs=Object.keys(map),c=rs.filter(r=>isOn(map[r].id)).length;
   btn.textContent=rs.length?'🖨 Printer '+c+'/'+rs.length:'🖨 Atur Printer BT';
-  btn.style.background=!rs.length?'#2457f5':c===rs.length?'#12a150':c?'#d98a00':'#c0392b';
+  const act=Object.keys(ROLES).filter(r=>modeOf(r)!=='browser');
+  const ok=act.filter(r=>modeOf(r)==='lan'?!!(cfg.relay&&(cfg.roles[r]||{}).ip):!!(map[r]&&isOn(map[r].id)));
+  const h=document.getElementById('prnSt');
+  if(h){
+   const cls=!act.length?'':ok.length===act.length?'g':ok.length?'o':'r';
+   h.className='ib prn '+cls;
+   const tx=h.querySelector('.tx');
+   if(tx)tx.textContent=!act.length?'Printer: Browser':ok.length===act.length?'Printer '+ok.length+'/'+act.length:ok.length?'Printer '+ok.length+'/'+act.length:'Printer terputus';
+   h.title=!act.length?'Memakai dialog cetak browser':act.map(r=>ROLES[r]+': '+(ok.includes(r)?'tersambung':'belum tersambung')).join('\n');
+  }
  };
  const refresh=()=>{paint();if(document.getElementById('btPanel'))setModal('perangkat')};
  paint();
@@ -1555,7 +1624,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
   if(!(await ensure(role))){toast('Printer '+ROLES[role]+' belum tersambung. Pilih printer dulu.');return}
   try{await sendText(role,txt,1);toast('Tes terkirim ke '+map[role].name)}catch(e){toast('Tes gagal: '+e.message)}
  }
- window.BT={roles:ROLES,state,devices,connect,use,clear,test,setMode,setLan,setRelay,ping,relay:()=>cfg.relay};
+ window.BT={paint,roles:ROLES,state,devices,connect,use,clear,test,setMode,setLan,setRelay,ping,relay:()=>cfg.relay};
 })();
 
 /* layar penuh */
