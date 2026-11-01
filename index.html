@@ -851,7 +851,7 @@ async function printJobs(jobs){
 function printText(txt,kind){printJobs([{txt,kind:kind||'receipt'}])}
 const txCtx=t=>({type:t.type,channel:t.channel,table:t.table,cust:t.custName,by:t.cashier,no:t.no,ts:t.ts,lines:t.items});
 function catOf(pid){const p=db.products.find(x=>x.id===pid);return p?p.cat:''}
-function lineCat(l){return l.cat||catOf(l.pid)}
+function lineCat(l){return catOf(l.pid)||l.cat}
 function barItems(lines){const B=db.settings.print.bar;if(!B.on)return[];const c=B.cats||[];return lines.filter(l=>c.includes(lineCat(l)))}
 function kitchenItems(lines){const c=db.settings.print.kitchen.cats||[],B=db.settings.print.bar,bc=B.on?(B.cats||[]):[];return lines.filter(l=>{const k=lineCat(l);return(!c.length||c.includes(k))&&!bc.includes(k)})}
 function ticketHead(f,title,o){
@@ -933,7 +933,7 @@ function ownerGate(w){verifyPin(['owner'],'Akses Owner',()=>{w==='rep'?openRepor
 /* ---------- riwayat & refund ---------- */
 const stBadge=t=>t.status==='void'?'<span class="badge v">Refund penuh</span>':t.status==='partial'?'<span class="badge k">Refund sebagian</span>':'';
 /* kategori produk terjual: itCat = kategori item, grpCat = kelompokkan per kategori, catTable = tabel HTML */
-function itCat(i){return i.cat||catOf(i.pid)||'Umum'}
+function itCat(i){return catOf(i.pid)||i.cat||'Umum'}
 function grpCat(m){
  const g={};
  Object.entries(m).forEach(([n,o])=>{if(!(o.q>0))return;const c=o.cat||'Umum';const x=g[c]||(g[c]={rev:0,list:[]});x.rev+=o.rev;x.list.push([n,o])});
