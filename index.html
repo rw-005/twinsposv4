@@ -159,6 +159,13 @@ th{color:var(--mut);font-size:12.5px;text-transform:uppercase;letter-spacing:.04
  #btBtn{padding:8px 12px!important;font-size:12px!important}
 }
 #printArea{display:none}
+.sheet.paid{max-width:none;width:100%;height:100vh;height:100dvh;max-height:none;border-radius:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:24px;text-align:center;overflow:auto}
+.sheet.paid .pw{width:100%;max-width:560px}
+.sheet.paid .pt{font-size:34px;font-weight:800;margin:0 0 6px}
+.sheet.paid .pbox{background:var(--soft);border-radius:22px;padding:26px 22px;margin:20px 0}
+.sheet.paid .pbox small{display:block;color:var(--mut);font-size:15px;font-weight:600}
+.sheet.paid .pbox b{display:block;font-size:40px;font-weight:800;line-height:1.15;margin-top:2px}
+.sheet.paid .pbox .kb{margin-top:18px}.sheet.paid .pbox .kb b{color:var(--ok);font-size:52px}
 @media (max-width:800px) and (orientation:portrait){
  header{padding:8px 10px;gap:6px}.logo.sm{font-size:19px;letter-spacing:.3em;margin-right:-.3em}.logo.sm span{letter-spacing:.3em}.hr .tx{display:none}.hr .btn{padding:0;width:50px}.nav{justify-content:flex-start;padding:6px 10px 8px}
  .main{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 52vh;grid-template-rows:minmax(0,1fr) 52dvh;gap:8px;padding:8px}
@@ -372,7 +379,7 @@ const S={user:null,shift:null,cart:[],manual:{type:'pct',val:0},cat:'Semua',q:''
 
 /* ---------- util ---------- */
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),2600)}
-function openModal(html,wide,cls){$('#sheet').className='sheet'+(wide?' wide':'')+(cls?' '+cls:'');$('#sheet').innerHTML=html;$('#modal').classList.toggle('full',cls==='panel');$('#modal').classList.add('on');$('#sheet').scrollTop=0}
+function openModal(html,wide,cls){$('#modal').style.padding='';$('#sheet').className='sheet'+(wide?' wide':'')+(cls?' '+cls:'');$('#sheet').innerHTML=html;$('#modal').classList.toggle('full',cls==='panel');$('#modal').classList.add('on');$('#sheet').scrollTop=0}
 function panel(title,sub,body){openModal(`<div class="ph-head"><button class="ib bk" onclick="closeSet()" aria-label="Kembali">${ic('back',20)}</button><div style="flex:1;min-width:0"><h3>${title}</h3>${sub?`<div class="sub">${sub}</div>`:''}</div><button class="ib" onclick="closeSet()" aria-label="Tutup">${ic('x',20)}</button></div><div class="ph-body">${body}</div>`,true,'panel')}
 const card=(t,d,inner,acts)=>`<div class="card"><div class="ch"><div><h4>${t}</h4>${d?`<p>${d}</p>`:''}</div>${acts||''}</div>${inner}</div>`;
 const fld=(l,inner,full)=>`<div class="f${full?' full':''}"><label>${l}</label>${inner}</div>`;
@@ -778,7 +785,7 @@ function finalize(){
  if(!S.cart.length){if(S.orderId)db.orders=db.orders.filter(o=>o.id!==S.orderId);resetCart()}
  else if(S.orderId){const o=db.orders.find(x=>x.id===S.orderId);if(o)o.items=S.cart}
  save();renderNav();renderLeft();renderCart();
- receiptModal(t);
+ paidModal(t);
  const P=db.settings.print,jobs=[];
  if(P.receipt.auto)jobs.push({txt:receiptText(t),kind:'receipt'});
  if(P.kitchen.on&&P.kitchen.onPay){const kk=kitchenItems(kl);if(kk.length)jobs.push({txt:kitchenText({...kctx,lines:kk,addendum:false}),kind:'kitchen'})}
@@ -831,6 +838,15 @@ function refundText(r){
 function textModal(title,txt,wa,extra,kind){
  window._rt=txt;window._rk=kind||'receipt';
  openModal(`<h3>${esc(title)}</h3><pre class="rc">${esc(txt)}</pre><div class="mrow"><button class="btn pri" onclick="printText(window._rt,window._rk)">${ic('printer',16)} Cetak</button><button class="btn" data-w="${esc(wa||'')}" onclick="waShare(window._rt,this.dataset.w)">WhatsApp</button></div>${extra||''}<div class="mrow"><button class="btn" onclick="closeModal()">Tutup</button></div>`);
+}
+/* tampilan singkat setelah pembayaran: hanya terima kasih, total tagihan, kembalian (tunai). Tombol cetak tetap ada. */
+function paidModal(t){
+ window._rt=receiptText(t);window._rk='receipt';
+ const cash=t.payments.some(p=>p.m==='tunai');
+ openModal(`<div class="pw"><div class="pt">Terima kasih 🙏</div><div class="mut" style="font-size:14px">${esc(t.no)}</div>
+ <div class="pbox"><div><small>Total tagihan</small><b>${rp(t.total)}</b></div>${cash?`<div class="kb"><small>Kembalian</small><b>${rp(t.change||0)}</b></div>`:''}</div>
+ <div class="mrow"><button class="btn pri" onclick="printText(window._rt,window._rk)">${ic('printer',16)} Cetak</button><button class="btn" data-w="${esc(t.customer?t.customer.wa:'')}" onclick="waShare(window._rt,this.dataset.w)">WhatsApp</button></div>${ticketBtns(t.id)}<div class="mrow"><button class="btn big" style="margin-top:0" onclick="closeModal()">Tutup</button></div></div>`,false,'paid');
+ $('#modal').style.padding='0';
 }
 function receiptModal(t){
  const rf=db.refunds.filter(r=>r.txId===t.id);
