@@ -932,14 +932,27 @@ function ownerGate(w){verifyPin(['owner'],'Akses Owner',()=>{w==='rep'?openRepor
 
 /* ---------- riwayat & refund ---------- */
 const stBadge=t=>t.status==='void'?'<span class="badge v">Refund penuh</span>':t.status==='partial'?'<span class="badge k">Refund sebagian</span>':'';
+/* kategori produk terjual: itCat = kategori item, grpCat = kelompokkan per kategori, catTable = tabel HTML */
+function itCat(i){return i.cat||catOf(i.pid)||'Umum'}
+function grpCat(m){
+ const g={};
+ Object.entries(m).forEach(([n,o])=>{if(!(o.q>0))return;const c=o.cat||'Umum';const x=g[c]||(g[c]={rev:0,list:[]});x.rev+=o.rev;x.list.push([n,o])});
+ return Object.entries(g).sort((a,b)=>b[1].rev-a[1].rev).map(([c,x])=>[c,{rev:x.rev,list:x.list.sort((a,b)=>b[1].q-a[1].q)}]);
+}
+function catTable(m){
+ const g=grpCat(m);
+ return g.length?`<div class="tw"><table><tr><th>Kategori / Produk</th><th class="r">Qty</th><th class="r">Penjualan</th></tr>${g.map(([c,x])=>`<tr style="background:var(--soft)"><td colspan="2"><b>${esc(c)}</b></td><td class="r"><b>${rp(x.rev)}</b></td></tr>`+x.list.map(([n,o])=>`<tr><td style="padding-left:20px">${esc(n)}</td><td class="r">${fq(o.q)} ${esc(o.unit)}</td><td class="r">${rp(o.rev)}</td></tr>`).join('')).join('')}</table></div>`:`<div class="empty">${ic('chart',34)}<div>Belum ada penjualan</div></div>`;
+}
 function shiftDetail(id){
  const sh=db.shifts.find(x=>x.id===id);if(!sh)return;
  const c=shiftCalc(sh),tx=db.tx.filter(t=>t.shiftId===id).sort((a,b)=>a.ts-b.ts),cs=db.cash.filter(x=>x.shiftId===id).sort((a,b)=>a.ts-b.ts),end=sh.closeTs||Date.now(),done=!!sh.closeTs;
+ const sp=shiftProd(sh);
  const row=(l,v,b)=>`<tr><td>${l}</td><td class="r">${b?'<b>'+v+'</b>':v}</td></tr>`;
  panel('Detail Shift',esc(sh.name)+' · '+fmtT(sh.openTs),`<div class="kgrid"><div class="kc hero"><small>${done?'Shift selesai · durasi kerja':'Shift berjalan · durasi sejauh ini'}</small><b>${dur(end-sh.openTs)}</b><div style="margin-top:8px;font-size:14px;opacity:.9">Masuk ${fmtT(sh.openTs)} · ${done?'Pulang '+fmtT(sh.closeTs):'belum pulang'}</div></div>
  <div class="kc"><small>Total penjualan</small><b>${rp(c.sales)}</b></div><div class="kc"><small>Jumlah nota</small><b>${c.count}</b></div><div class="kc"><small>Refund</small><b>${rp(c.refunds)}</b></div></div>
  ${card('Rekonsiliasi Kas','Perhitungan uang di laci',`<div class="tw"><table>${row('Modal awal',rp(sh.modal))}${row('Penjualan tunai',rp(c.by.tunai))}${row('Refund tunai','−'+rp(c.rby.tunai))}${row('Uang masuk lain','+'+rp(c.cin))}${row('Pengeluaran kas','−'+rp(c.cout))}${row('Kas seharusnya',rp(c.expected),1)}${done?row('Uang fisik dihitung',rp(sh.counted))+row('Selisih',`<span style="color:var(--${sh.diff===0?'ok':sh.diff>0?'warn':'bad'})">${sh.diff===0?'PAS':(sh.diff>0?'Lebih ':'Minus ')+rp(Math.abs(sh.diff))}</span>`,1):row('Uang fisik','<span class="mut">belum dihitung</span>')}</table></div>`)}
  ${card('Penerimaan per Metode','',`<div class="tw"><table><tr><th>Metode</th><th class="r">Masuk</th><th class="r">Refund</th></tr>${Object.keys(METHODS).filter(m=>c.by[m]||c.rby[m]).map(m=>`<tr><td>${METHODS[m]}</td><td class="r">${rp(c.by[m])}</td><td class="r">${rp(c.rby[m])}</td></tr>`).join('')||'<tr><td colspan="3" class="mut">Belum ada transaksi</td></tr>'}</table></div>`)}
+ ${card('Penjualan Produk','Produk yang terjual di shift ini (setelah refund)',sp.length?catTable(Object.fromEntries(sp)):`<div class="empty">${ic('chart',34)}<div>Belum ada penjualan</div></div>`)}
  ${card('Transaksi Shift',tx.length+' nota',tx.length?`<div class="tw"><table><tr><th>Nota</th><th>Jam</th><th>Tipe</th><th class="r">Total</th></tr>${tx.map(t=>`<tr><td><b>${esc(t.no)}</b> ${stBadge(t)}</td><td>${fmtH(t.ts)}</td><td>${esc(typeLabel(t.type,t.channel))}</td><td class="r">${rp(t.total)}</td></tr>`).join('')}</table></div>`:`<div class="empty">${ic('file',34)}<div>Belum ada transaksi</div></div>`)}
  ${cs.length?card('Catatan Kas Shift',cs.length+' catatan',`<div class="tw"><table><tr><th>Jam</th><th>Kategori</th><th>Catatan</th><th class="r">Nominal</th></tr>${cs.map(x=>`<tr><td>${fmtH(x.ts)}</td><td>${esc(x.cat)}${x.src==='luar'?' <span class="badge k">luar laci</span>':''}</td><td>${esc(x.note||'—')}</td><td class="r" style="color:var(--${x.type==='out'?'bad':'ok'})">${x.type==='out'?'−':'+'}${rp(x.amount)}</td></tr>`).join('')}</table></div>`):''}
  <div class="quick">${done?`<button class="btn pri" onclick="zShift('${id}')">${ic('printer',16)} Cetak Z-Report</button>`:''}<button class="btn" onclick="repModal()">← Kembali ke laporan</button></div>`);
@@ -1075,6 +1088,15 @@ function cashCalc(exp){
  const d=t-exp;$('#cc_t').textContent=rp(t);
  const e=$('#cc_d');e.textContent=d===0?'PAS':d>0?'Lebih '+rp(d):'Minus '+rp(-d);e.style.color=d===0?'var(--ok)':d>0?'var(--warn)':'var(--bad)';
 }
+/* produk terjual pada satu shift (qty bersih setelah refund) */
+function shiftProd(sh){
+ const m={};
+ db.tx.filter(t=>t.shiftId===sh.id).forEach(t=>t.items.forEach(i=>{
+  const q=i.qty-(i.refQty||0);if(q<=0)return;
+  const o=m[i.name]||(m[i.name]={unit:i.unit,cat:itCat(i),q:0,rev:0});o.q+=q;o.rev+=q*i.price;
+ }));
+ return Object.entries(m).sort((a,b)=>b[1].q-a[1].q);
+}
 function zText(sh){
  const f=mkFmt(),{lr,hr}=f,c=shiftCalc(sh),d=sh.counted-c.expected;
  const L=[...head(f,'LAPORAN TUTUP KASIR (Z)'),lr('Kasir',sh.name),lr('Buka',fmtT(sh.openTs)),lr('Tutup',fmtT(sh.closeTs)),lr('Durasi',dur(sh.closeTs-sh.openTs)),hr,lr('Modal awal',num(sh.modal)),lr('Jumlah nota',c.count),lr('Total tagihan',num(c.sales)),hr,'PENERIMAAN PER METODE'];
@@ -1083,6 +1105,9 @@ function zText(sh){
  const anyR=Object.keys(METHODS).filter(m=>c.rby[m]);
  anyR.length?anyR.forEach(m=>L.push(lr(' '+METHODS[m],'-'+num(c.rby[m])))):L.push(' (tidak ada)');
  L.push(hr,lr('Tunai masuk',num(c.by.tunai)),lr('Refund tunai','-'+num(c.rby.tunai)),lr('Uang masuk lain','+'+num(c.cin)),lr('Pengeluaran kas','-'+num(c.cout)),lr('Kas seharusnya',num(c.expected)),lr('Uang fisik',num(sh.counted)),lr('Selisih',d===0?'PAS':(d>0?'LEBIH ':'MINUS ')+num(Math.abs(d))),hr);
+ const sp=shiftProd(sh);L.push('PENJUALAN PRODUK');
+ sp.length?grpCat(Object.fromEntries(sp)).forEach(([c,x])=>{L.push('['+c.toUpperCase()+']');x.list.forEach(([n,o])=>{L.push(...f.wrap(n));L.push(lr('  '+fq(o.q)+' '+o.unit+' x',num(o.rev)))});L.push(lr(' Subtotal '+c,num(x.rev)))}):L.push(' (tidak ada)');
+ L.push(hr,lr('Total item',fq(sum(sp,x=>x[1].q))),hr);
  return L.join('\n');
 }
 function doCloseShift(){
@@ -1115,12 +1140,15 @@ function repData(){
  const by={},rby={};Object.keys(METHODS).forEach(m=>{by[m]=0;rby[m]=0});
  tx.forEach(t=>t.payments.forEach(p=>by[p.m]+=p.ap));rf.forEach(r=>rby[r.method]+=r.amount);
  const prod={};
- tx.forEach(t=>t.items.forEach(i=>{const q=i.qty-(i.refQty||0);const o=prod[i.name]||(prod[i.name]={unit:i.unit,q:0,rev:0,profit:0});o.q+=q;o.rev+=q*i.price;o.profit+=q*(i.price-i.cogs)}));
+ tx.forEach(t=>t.items.forEach(i=>{const q=i.qty-(i.refQty||0);const o=prod[i.name]||(prod[i.name]={unit:i.unit,cat:itCat(i),q:0,rev:0,profit:0});o.q+=q;o.rev+=q*i.price;o.profit+=q*(i.price-i.cogs)}));
+ /* produk terjual per kasir (qty bersih setelah refund) */
+ const kp={};
+ tx.forEach(t=>t.items.forEach(i=>{const q=i.qty-(i.refQty||0);if(q<=0)return;const c=kp[t.cashier]||(kp[t.cashier]={});const o=c[i.name]||(c[i.name]={unit:i.unit,cat:itCat(i),q:0,rev:0});o.q+=q;o.rev+=q*i.price}));
  const cs=db.cash.filter(x=>inR(x.ts)),cout=sum(cs.filter(x=>x.type==='out'),x=>x.amount),cin=sum(cs.filter(x=>x.type==='in'),x=>x.amount),cbycat={};cs.filter(x=>x.type==='out').forEach(x=>{cbycat[x.cat]=(cbycat[x.cat]||0)+x.amount});
  const kas={},K=n=>kas[n]||(kas[n]={n:0,total:0,tunai:0,non:0,ref:0,sel:0,jam:0});
  tx.forEach(t=>{const o=K(t.cashier);o.n++;o.total+=t.total;t.payments.forEach(p=>p.m==='tunai'?o.tunai+=p.ap:o.non+=p.ap)});rf.forEach(r=>{K(r.cashier).ref+=r.amount});sh.forEach(x=>{const o=K(x.name);o.jam+=(x.closeTs||Date.now())-x.openTs;if(x.closeTs)o.sel+=x.diff});
  const chan={};tx.forEach(t=>{const k=typeLabel(t.type,t.channel),o=chan[k]||(chan[k]={n:0,total:0});o.n++;o.total+=t.total});
- return{kas,chan,tx,rf,sh,gross,refAmt,omzet:gross-refAmt,net,cogs,profit:net-cogs,cs,cout,cin,cbycat,netProfit:net-cogs-cout,svc:sum(tx,t=>t.service)-sum(rf,r=>r.service),tax:sum(tx,t=>t.tax)-sum(rf,r=>r.tax),by,rby,prod,
+ return{kp,kas,chan,tx,rf,sh,gross,refAmt,omzet:gross-refAmt,net,cogs,profit:net-cogs,cs,cout,cin,cbycat,netProfit:net-cogs-cout,svc:sum(tx,t=>t.service)-sum(rf,r=>r.service),tax:sum(tx,t=>t.tax)-sum(rf,r=>r.tax),by,rby,prod,
   drawer:sum(db.shifts.filter(s=>!s.closeTs),s=>shiftCalc(s).expected)};
 }
 const stTxt=t=>t.status==='void'?'Refund Penuh':t.status==='partial'?'Refund Sebagian':'Selesai';
@@ -1129,6 +1157,8 @@ function sheetDefs(d){
  return[
  {label:'Ringkasan',name:'Ringkasan',rows:[['Laporan TWINS POS'],['Outlet',db.settings.name],['Periode',perLabel()],[],['Total omzet (setelah refund)',d.omzet],['Total tagihan (sebelum refund)',d.gross],['Total refund',d.refAmt],['Penjualan bersih (setelah diskon, tanpa pajak & service)',d.net],['Service charge',d.svc],['Pajak',d.tax],['HPP / COGS',d.cogs],['Estimasi laba kotor',d.profit],['Total pengeluaran operasional',d.cout],['Uang masuk lain (non-penjualan)',d.cin],['Estimasi laba bersih (laba kotor − pengeluaran)',d.netProfit],['Jumlah nota',d.tx.length],['Kas seharusnya di laci (shift aktif)',d.drawer]]},
  {label:'Per Kasir',name:'Per Kasir',rows:[['Kasir','Jumlah Nota','Total Penjualan','Tunai','Non-Tunai','Refund','Jam Kerja (menit)','Selisih Kas'],...Object.entries(d.kas).map(([n,o])=>[n,o.n,o.total,o.tunai,o.non,o.ref,Math.round(o.jam/60000),o.sel])]},
+ {label:'Produk per Kasir',name:'Produk per Kasir',rows:[['Kasir','Kategori','Produk','Satuan','Qty Terjual (bersih)','Penjualan'],...Object.entries(d.kp).flatMap(([k,m])=>Object.entries(m).sort((a,b)=>String(a[1].cat).localeCompare(String(b[1].cat))||b[1].q-a[1].q).map(([n,o])=>[k,o.cat||'Umum',n,o.unit,+o.q.toFixed(3),Math.round(o.rev)]))]},
+ {label:'Produk per Kategori',name:'Produk per Kategori',rows:[['Kategori','Produk','Satuan','Qty Terjual (bersih)','Penjualan'],...grpCat(d.prod).flatMap(([c,x])=>x.list.map(([n,o])=>[c,n,o.unit,+o.q.toFixed(3),Math.round(o.rev)]))]},
  {label:'Penjualan',name:'Penjualan',rows:[['No Nota','Tanggal','Kasir','Tipe','Meja','Pelanggan','Subtotal','Diskon Promo','Diskon Manual','Service','Pajak','Pembulatan','Total','Pembayaran','Status','Total Refund'],...d.tx.map(t=>[t.no,fmtDT(t.ts),t.cashier,typeLabel(t.type,t.channel),t.table||'',t.custName||'',t.subtotal,t.autoDisc,t.manualDisc,t.service,t.tax,t.rounding,t.total,t.payments.map(p=>METHODS[p.m]+' '+p.ap).join(' + '),stTxt(t),t.refunded||0])]},
  {label:'Detail Item',name:'Detail Item',rows:[['No Nota','Tanggal','Produk','Satuan','Qty','Harga','Subtotal','HPP/unit','Qty Refund'],...d.tx.flatMap(t=>t.items.map(i=>[t.no,fmtDT(t.ts),i.name,i.unit,i.qty,i.price,i.qty*i.price,i.cogs,i.refQty||0]))]},
  {label:'Produk Terlaris',name:'Produk Terlaris',rows:[['Peringkat','Produk','Satuan','Qty Terjual (bersih)','Penjualan','Laba Kotor'],...top.map(([n,o],k)=>[k+1,n,o.unit,+o.q.toFixed(3),Math.round(o.rev),Math.round(o.profit)])]},
@@ -1154,7 +1184,7 @@ function exportX(base,sheets){
  const q=v=>{v=v==null?'':String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
  const out=['sep=;'];
  sheets.forEach(s=>{if(sheets.length>1){out.push('',q('== '+s.name+' =='))}s.rows.forEach(r=>out.push(r.map(q).join(';')))});
- dlBlob(new Blob(['﻿'+out.join('\r\n')],{type:'text/csv;charset=utf-8'}),base+'-'+stamp+'.csv');
+ dlBlob(new Blob(['\uFEFF'+out.join('\r\n')],{type:'text/csv;charset=utf-8'}),base+'-'+stamp+'.csv');
  toast('Library Excel tidak termuat (offline) — diunduh sebagai CSV yang bisa dibuka di Excel');
 }
 function exportRep(i){const s=window._sheets;i<0?exportX('Laporan-TWINS-POS',s):exportX('Laporan-'+s[i].label.replace(/[^\w]+/g,'-'),[s[i]])}
@@ -1170,6 +1200,8 @@ function repModal(){
  <div class="kgrid"><div class="kc hero"><small>Total omzet (setelah refund) · ${esc(perLabel())}</small><b>${rp(d.omzet)}</b><div style="margin-top:8px;font-size:14px;opacity:.9">${d.tx.length} nota${d.refAmt?' · refund '+rp(d.refAmt):''}</div></div>
  <div class="kc"><small>Estimasi laba kotor</small><b>${rp(d.profit)}</b></div><div class="kc"><small>Pengeluaran operasional</small><b>${rp(d.cout)}</b></div><div class="kc"><small>Estimasi laba bersih</small><b>${rp(d.netProfit)}</b></div><div class="kc"><small>Uang masuk lain</small><b>${rp(d.cin)}</b></div><div class="kc"><small>Jumlah nota</small><b>${d.tx.length}</b></div><div class="kc"><small>Refund</small><b>${rp(d.refAmt)}</b></div><div class="kc"><small>Service charge</small><b>${rp(d.svc)}</b></div><div class="kc"><small>Pajak</small><b>${rp(d.tax)}</b></div><div class="kc"><small>Kas di laci (shift aktif)</small><b>${rp(d.drawer)}</b></div></div>
  ${card('Laporan per Kasir','Penjualan, kas, dan jam kerja tiap kasir (semua perangkat)',`<div class="tw"><table><tr><th>Kasir</th><th class="r">Nota</th><th class="r">Penjualan</th><th class="r">Tunai</th><th class="r">Non-tunai</th><th class="r">Refund</th><th>Jam</th><th class="r">Selisih kas</th></tr>${Object.entries(d.kas).map(([n,o])=>`<tr><td><b>${esc(n)}</b></td><td class="r">${o.n}</td><td class="r"><b>${rp(o.total)}</b></td><td class="r">${rp(o.tunai)}</td><td class="r">${rp(o.non)}</td><td class="r">${rp(o.ref)}</td><td>${dur(o.jam)}</td><td class="r">${o.sel===0?'Pas':(o.sel>0?'+':'-')+rp(Math.abs(o.sel))}</td></tr>`).join('')||'<tr><td colspan="8" class="mut">Belum ada data</td></tr>'}</table></div>`)}
+ ${card('Penjualan Produk per Kasir','Qty dan nilai tiap produk yang dijual masing-masing kasir (setelah refund)',Object.keys(d.kp).length?Object.entries(d.kp).map(([k,m])=>{const l=Object.entries(m).sort((a,b)=>b[1].q-a[1].q);return `<div style="margin-bottom:14px"><b>${esc(k)}</b> <span class="badge">${l.length} produk · ${rp(sum(l,x=>x[1].rev))}</span>${catTable(m)}</div>`}).join(''):`<div class="empty">${ic('chart',34)}<div>Belum ada penjualan</div></div>`)}
+ ${card('Penjualan per Kategori','Total penjualan tiap kategori beserta produknya (setelah refund)',catTable(d.prod))}
  ${card('Metode Pembayaran','Penerimaan dan refund per metode',`<div class="tw"><table><tr><th>Metode</th><th class="r">Masuk</th><th class="r">Refund</th><th class="r">Bersih</th></tr>${pm.map(m=>`<tr><td>${METHODS[m]}</td><td class="r">${rp(d.by[m])}</td><td class="r">${rp(d.rby[m])}</td><td class="r"><b>${rp(d.by[m]-d.rby[m])}</b></td></tr>`).join('')||'<tr><td colspan="4" class="mut">Belum ada data</td></tr>'}</table></div>`)}
  ${card('Tipe Order &amp; Channel','Dine In, Take Away, dan ojek online',`<div class="tw"><table><tr><th>Tipe</th><th class="r">Nota</th><th class="r">Total</th></tr>${Object.entries(d.chan).map(([k,o])=>`<tr><td>${esc(k)}</td><td class="r">${o.n}</td><td class="r"><b>${rp(o.total)}</b></td></tr>`).join('')||'<tr><td colspan="3" class="mut">Belum ada data</td></tr>'}</table></div>`)}
  ${card('Pengeluaran Operasional','Per kategori',Object.keys(d.cbycat).length?`<div class="tw"><table><tr><th>Kategori</th><th class="r">Total</th></tr>${Object.entries(d.cbycat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r"><b>${rp(v)}</b></td></tr>`).join('')}</table></div>`:`<div class="empty">${ic('wallet',34)}<div>Belum ada pengeluaran</div></div>`)}
@@ -1300,7 +1332,7 @@ function prodForm(id){
 function delProd(id){if(confirm('Hapus produk ini?')){db.products=db.products.filter(p=>p.id!==id);syncDel('products',id);save();setModal('produk')}}
 function tplProd(){exportX('Template-Import-Produk',[{name:'Produk',rows:[['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'],['Es Kopi Susu','Minuman','gelas',18000,9000,100,'','Small:0; Regular:3000; Large:6000','Boba:3000; Cheese Foam:5000; Extra Shot:4000'],['Roti Coklat','Roti','pcs',8000,5000,50,'8991234567890','',''],['Beras Curah','Sembako','kg',13000,11000,100,'','','']]},{name:'Petunjuk',rows:[['PETUNJUK'],['Varian & Topping: pisahkan dengan titik koma (;). Format Nama:TambahanHarga. Contoh: Small:0; Large:5000'],['Tambahan harga = selisih dari Harga Jual (0 jika sama). Maksimal '+MAXOPT+' varian dan '+MAXOPT+' topping per produk.'],['Kolom Stok boleh dikosongkan: produk itu tidak dihitung stoknya (tidak pernah habis).'],['Kosongkan kolom Varian/Topping jika tidak ada. Pada produk yang sudah ada, kolom kosong = varian/topping lama tidak diubah.']]}])}
 function parseCSV(txt){
- txt=txt.replace(/^﻿/,'').replace(/^sep=.\r?\n/i,'');
+ txt=txt.replace(/^\uFEFF/,'').replace(/^sep=.\r?\n/i,'');
  const first=txt.split(/\r?\n/)[0]||'',dl=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';
  const rows=[];let row=[],cur='',q=false;
  for(let i=0;i<txt.length;i++){const ch=txt[i];
