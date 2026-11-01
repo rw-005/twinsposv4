@@ -367,6 +367,7 @@ th{color:var(--mut);font-size:12.5px;text-transform:uppercase;letter-spacing:.04
 .so.has em{background:#3a2a00;color:#ffcf40}
 @media (max-width:800px) and (orientation:portrait){.so{width:46px!important;padding:0}.so em{position:absolute;top:-5px;right:-5px;font-size:11px;padding:0 6px}}
 @media (orientation:landscape) and (max-height:520px){header .so{height:42px;padding:0 10px;font-size:12.5px}}
+.nav.side .nv.tutup{color:var(--bad)}.nav.side .nv.tutup:hover{background:#fde4e8}
 </style>
 </head>
 <body>
@@ -532,8 +533,7 @@ function hlHTML(){return `<b>${esc(db.settings.name)}</b>${esc(S.user.name)} · 
 function renderMain(){
  $('#app').innerHTML=`<div class="shell">
  <div class="topbar"><header><div style="display:flex;align-items:center;gap:8px;min-width:0"><button class="ib" id="navT" onclick="toggleNav()" aria-label="Buka/tutup menu">${ic('menu',22)}</button><button class="ib bkb" id="bkb" onclick="goBack()" aria-label="Kembali">${ic('back',22)}</button><div class="hl" id="hlt">${hlHTML()}</div></div><div class="logo sm">TWINS<span>POS</span></div>
-  <div class="hr"><button class="ib so" id="soBtn" onclick="nav('orders')" title="Simpan Order">${ic('file',20)}<span class="tx">Simpan Order</span><em id="soN"></em></button><button class="ib prn" id="prnSt" onclick="setModal('perangkat')" title="Status printer"><span class="pdot"></span>${ic('printer',20)}<span class="tx">Printer</span></button><button class="ib" id="thb" onclick="toggleTheme()">${ic(db.theme==='dark'?'sun':'moon',20)}</button>
-  <button class="btn sm bad" onclick="closeShiftModal()">${ic('power',19)}<span class="tx">Tutup Kasir</span></button></div></header>
+  <div class="hr"><button class="ib so" id="soBtn" onclick="nav('orders')" title="Simpan Order">${ic('file',20)}<span class="tx">Simpan Order</span><em id="soN"></em></button><button class="ib prn" id="prnSt" onclick="setModal('perangkat')" title="Status printer"><span class="pdot"></span>${ic('printer',20)}<span class="tx">Printer</span></button><button class="ib" id="thb" onclick="toggleTheme()">${ic(db.theme==='dark'?'sun':'moon',20)}</button></div></header>
  </div>
  <div class="body ${S.navOpen?'':'navc'}"><nav class="nav side" id="nav"></nav>
  <div class="main"><section class="left" id="left"></section>
@@ -557,8 +557,8 @@ function renderNav(){
  const sb=$('#soBtn'),sn=$('#soN');
  if(sb&&sn){const c=db.orders.length;sn.textContent=c||'';sn.style.display=c?'':'none';sb.classList.toggle('has',c>0)}
  const n=$('#nav');if(!n)return;
- const it=[['pos','grid','Kasir'],['orders','file','Simpan Order',db.orders.length],['hist','clock','Riwayat Penjualan'],['kas','wallet','Kas'],['rep','chart','Laporan Penjualan'],['inv','box','Produk & Inventory'],['set','sliders','Pengaturan']];
- n.innerHTML=it.map(([k,i,l,b])=>`<button class="nv ${S.view===k?'on':''}" onclick="nav('${k}')">${ic(i,22)}<span>${l}</span>${b?`<em>${b}</em>`:''}</button>`).join('')+`<a class="navsvc" href="https://wa.me/6285695165552" target="_blank" rel="noopener">${ic('chat',22)}<b>Layanan</b><span>Hubungi WA<br>0856 9516 5552</span></a>`;
+ const it=[['pos','grid','Kasir'],['orders','file','Simpan Order',db.orders.length],['hist','clock','Riwayat Penjualan'],['kas','wallet','Kas'],['rep','chart','Laporan Penjualan'],['inv','box','Produk & Inventory'],['set','sliders','Pengaturan'],['tutup','power','Tutup Kasir']];
+ n.innerHTML=it.map(([k,i,l,b])=>`<button class="nv ${k==='tutup'?'tutup':S.view===k?'on':''}" onclick="nav('${k}')">${ic(i,22)}<span>${l}</span>${b?`<em>${b}</em>`:''}</button>`).join('')+`<a class="navsvc" href="https://wa.me/6285695165552" target="_blank" rel="noopener">${ic('chat',22)}<b>Layanan</b><span>Hubungi WA<br>0856 9516 5552</span></a>`;
 }
 function nav(k){
  if(k==='hist')return histModal();
@@ -566,6 +566,7 @@ function nav(k){
  if(k==='rep')return ownerGate('rep');
  if(k==='inv')return setModal('menu');
  if(k==='set')return setModal('outlet');
+ if(k==='tutup')return closeShiftModal();
  S.view=k;renderNav();renderLeft();
 }
 function renderLeft(){
