@@ -872,7 +872,18 @@ function custModal(){
  PL.mount('plv');
 }
 /* ---------- Dilayani oleh (karyawan dari Backoffice) ---------- */
-function srvList(){return(db.employees||[]).filter(e=>e&&e.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
+/* ---------- Kunci fitur per klien (data master di Google Sheet milik admin, dicocokkan dengan hash URL script klien) ---------- */
+const MASTER_URL='https://script.google.com/macros/s/AKfycbx5FGMO82d9OIzGrgxp-aezLVSbusfsHH6veu-V_7P7KNb9qfQFyorG86mCZjLd8uHTJw/exec';   // <- tempel URL Web App script MASTER di sini (…/exec)
+const FT={on:new Set(),code:'',wa:'',msg:'',nama:'',exp:false};
+const hasF=k=>FT.on.has(k);
+async function urlCode(u){try{const n=String(u||'').trim().split('?')[0].replace(/\/+$/,'').toLowerCase();if(!n||!(window.crypto&&crypto.subtle))return'';const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(n));return[...new Uint8Array(b)].slice(0,6).map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return''}}
+async function loadFitur(u){
+ FT.code=await urlCode(u);let j=null;const CK='twins_fitur_'+FT.code;
+ if(MASTER_URL&&FT.code){try{const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);const r=await fetch(MASTER_URL+(MASTER_URL.includes('?')?'&':'?')+'kode='+FT.code,{redirect:'follow',signal:c.signal});clearTimeout(t);const x=await r.json();if(x&&x.ok){j=x;try{localStorage.setItem(CK,JSON.stringify(x))}catch(e){}}}catch(e){}}
+ if(!j){try{j=JSON.parse(localStorage.getItem(CK))}catch(e){}}
+ FT.on=new Set((j&&j.fitur)||[]);FT.wa=(j&&j.wa)||'';FT.msg=(j&&j.pesan)||'';FT.nama=(j&&j.nama)||'';FT.exp=!!(j&&j.exp);
+}
+function srvList(){return!hasF('karyawan')?[]:(db.employees||[]).filter(e=>e&&e.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
 function srvPick(){
  const l=srvList();if(!l.length){toast('Belum ada karyawan. Tambahkan di Backoffice lalu sinkron.');return}
  const sel=new Set((S.servers||[]).map(x=>x.id));window._srvSel=sel;
@@ -1813,7 +1824,8 @@ async function syncPull(){
    const gone=new Set(r.dels&&r.dels[k]||[]);if(gone.size)db[k]=db[k].filter(o=>!gone.has(o.id));
   });
   if(Array.isArray(r.data.promos)){const mp=new Map((db.promos||[]).map(o=>[o.id,o]));r.data.promos.forEach(o=>{if(o&&o.id)mp.set(o.id,o)});const gp=new Set((r.dels&&r.dels.promos)||[]);const np2=[...mp.values()].filter(o=>!gp.has(o.id));if(JSON.stringify(np2)!==JSON.stringify(db.promos||[])){db.promos=np2;n++}try{renderPromo();renderTotals()}catch(_){}}
-  if(Array.isArray(r.data.employees)){const me=new Map(r.data.employees.filter(o=>o&&o.id).map(o=>[o.id,o])),ge=new Set((r.dels&&r.dels.employees)||[]);const ne=[...me.values()].filter(o=>!ge.has(o.id)).map(o=>({id:o.id,name:o.name,role:o.role||'',active:o.active!==false}));if(JSON.stringify(ne)!==JSON.stringify(db.employees||[])){db.employees=ne;n++}try{renderCart()}catch(_){}}
+  await loadFitur(SY.url);try{renderCart()}catch(_){}
+  if(hasF('karyawan')&&Array.isArray(r.data.employees)){const me=new Map(r.data.employees.filter(o=>o&&o.id).map(o=>[o.id,o])),ge=new Set((r.dels&&r.dels.employees)||[]);const ne=[...me.values()].filter(o=>!ge.has(o.id)).map(o=>({id:o.id,name:o.name,role:o.role||'',active:o.active!==false}));if(JSON.stringify(ne)!==JSON.stringify(db.employees||[])){db.employees=ne;n++}try{renderCart()}catch(_){}}
   ['tx','refunds','shifts','cash'].forEach(k=>db[k].sort((a,b)=>tsOf(k,a)-tsOf(k,b)));
   if(n&&S.user&&S.view==='pos'&&!document.querySelector('.modal,.mback,#modal.on')){try{renderCats();renderGrid()}catch(_){}}
   try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}
