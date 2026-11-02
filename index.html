@@ -418,6 +418,7 @@ IC.list='<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12
 IC.sync='<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>';
 IC.menu='<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>';
 IC.box='<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>';
+IC.users='<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
 IC.chat='<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>';
 const ic=(n,s)=>`<svg width="${s||18}" height="${s||18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[n]||''}</svg>`;
 
@@ -442,11 +443,11 @@ function defDB(){return{
   {id:'p7',name:'Kabel Listrik',cat:'Alat',unit:'meter',price:5000,cogs:3000,stock:200,barcode:'8999007',photo:''}
  ],
  discounts:[{id:'d1',name:'Happy Hour Sore',type:'pct',value:10,days:[1,2,3,4,5],start:'14:00',end:'16:00',on:true}],
- tx:[],refunds:[],shifts:[],orders:[],cash:[],customers:[],cgroups:[],promos:[]
+ tx:[],refunds:[],shifts:[],orders:[],cash:[],customers:[],cgroups:[],promos:[],employees:[]
 }}
 let db=(function(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.staff){const x=defDB();d.settings={...x.settings,...d.settings};const dp=defPrint(),sp=d.settings.print||{};d.settings.print={receipt:{...dp.receipt,...sp.receipt},kitchen:{...dp.kitchen,...sp.kitchen},checker:{...dp.checker,...sp.checker},bar:{...dp.bar,...sp.bar}};const dq=defOnline(),so=d.settings.online||{};d.settings.online={shopee:{...dq.shopee,...so.shopee},grab:{...dq.grab,...so.grab},gofood:{...dq.gofood,...so.gofood}};if(!d.v3){d.v3=1;d.settings.tableMode=true}['orders','refunds','tx','shifts','discounts','products','cash','customers','cgroups','promos'].forEach(k=>{if(!d[k])d[k]=[]});d.rseq=d.rseq||0;return d}}catch(e){}return defDB()})();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Penyimpanan penuh! Kurangi foto produk atau ekspor data.')}try{syncSoon()}catch(_){}}
-const S={user:null,shift:null,cart:[],manual:{type:'pct',val:0},voucher:'',pts:0,cat:'Semua',q:'',view:'pos',type:'take',table:'',cust:'',orderId:null,custId:'',meja:false,channel:'',pmode:'grid',lastPm:'grid'};
+const S={user:null,shift:null,cart:[],manual:{type:'pct',val:0},voucher:'',pts:0,cat:'Semua',q:'',view:'pos',type:'take',table:'',cust:'',orderId:null,custId:'',servers:[],meja:false,channel:'',pmode:'grid',lastPm:'grid'};
 S.navOpen=(()=>{try{const v=localStorage.getItem('twinspos_nav');if(v!==null)return v==='1'}catch(e){}return !(window.innerWidth<=800&&window.innerHeight>window.innerWidth)})();
 function toggleNav(){S.navOpen=!S.navOpen;try{localStorage.setItem('twinspos_nav',S.navOpen?'1':'0')}catch(e){}const b=document.querySelector('.shell .body');if(b)b.classList.toggle('navc',!S.navOpen)}
 try{const _pm=localStorage.getItem('twinspos_pm');if(_pm==='sku'||_pm==='grid')S.pmode=S.lastPm=_pm}catch(e){}
@@ -649,7 +650,7 @@ function renderMain(){
   <aside class="cart" id="cart">
    <div class="grab" id="grab" title="Geser naik/turun"><i></i></div>
    <div class="chead"><button class="ord" id="oinfo" onclick="orderInfoModal()"></button>
-    <span id="kbtn"></span><button class="ib" id="cbtn" title="Pelanggan" onclick="custPick()">${ic('user',17)}</button><button class="ib" title="Kosongkan" onclick="clearCart()">${ic('trash',17)}</button></div>
+    <span id="kbtn"></span><button class="ib" id="sbtn" title="Dilayani oleh" onclick="srvPick()" style="display:none">${ic('users',17)}</button><button class="ib" id="cbtn" title="Pelanggan" onclick="custPick()">${ic('user',17)}</button><button class="ib" title="Kosongkan" onclick="clearCart()">${ic('trash',17)}</button></div>
    <div class="lines" id="lines"></div>
    <div class="disc"><select id="mt" onchange="S.manual.type=this.value;renderTotals()"><option value="pct">Diskon %</option><option value="rp">Diskon Rp</option></select>
     <input id="mv" type="number" inputmode="decimal" min="0" placeholder="0" oninput="S.manual.val=parseFloat(this.value)||0;renderTotals()"><button class="btn" id="vpBtn" onclick="vpModal()" style="white-space:nowrap;padding:0 12px;display:none">🎟 Voucher/Poin</button></div>
@@ -749,7 +750,7 @@ function scanEnter(){
 
 /* ---------- cart ---------- */
 function resetCart(){
- S.cart=[];S.manual={type:'pct',val:0};S.voucher='';S.pts=0;S.orderId=null;S.table='';S.cust='';S.custId='';S.meja=false;S.channel='';S.type=db.settings.tableMode?'dine':'take';
+ S.cart=[];S.manual={type:'pct',val:0};S.voucher='';S.pts=0;S.orderId=null;S.table='';S.cust='';S.custId='';S.servers=[];S.meja=false;S.channel='';S.type=db.settings.tableMode?'dine':'take';
  const mv=$('#mv');if(mv){mv.value='';$('#mt').value='pct'}
  if($('#lines'))renderCart();
 }
@@ -790,6 +791,7 @@ function addLine(p,v,tops){
 function renderCart(){
  const oi=$('#oinfo');if(!oi)return;
  const cb=$('#cbtn');if(cb){cb.style.cssText=S.custId?'background:var(--pri);color:#fff;border-color:var(--pri)':'';cb.title=S.custId?'Pelanggan: '+S.cust:'Pelanggan'}
+ const sb=$('#sbtn');if(sb){const has=srvList().length>0;sb.style.display=has?'':'none';const on=(S.servers||[]).length>0;sb.style.cssText=(has?'':'display:none;')+(on?'background:var(--pri);color:#fff;border-color:var(--pri)':'');sb.title=on?'Dilayani: '+S.servers.map(x=>x.name).join(', '):'Dilayani oleh'}
  const kb=$('#kbtn');if(kb)kb.innerHTML=(db.settings.print.kitchen.on||db.settings.print.bar.on)?`<button class="btn sm" onclick="sendKitchen()">${ic('printer',16)} ${db.settings.print.bar.on?'Dapur/Bar':'Dapur'}</button>`:'';
  oi.innerHTML=`${ic(S.type==='dine'?'table':'bag',16)}<span>${S.type==='online'?esc(CH[S.channel]||'Online'):S.type==='dine'?'Dine In':'Take Away'}${S.type==='dine'&&S.meja&&!S.table?' · Pilih meja':''}${S.table?' · '+esc(S.table):''}${S.cust?' · '+esc(S.cust):''}</span>${S.orderId?'<em>Tersimpan</em>':''}`;
  $('#lines').innerHTML=S.cart.length?S.cart.map((l,i)=>`<div class="line"><div><div class="nm" onclick="editPrice(${i})">${esc(l.name)}</div><div class="lp" onclick="editPrice(${i})">${rp(l.price)}/${esc(l.unit)}${l.manual?' · diubah':l.cp?' · harga pelanggan':S.type==='online'&&l.price!==l.base?' · harga '+esc(CH[S.channel]||''):''} ${ic('edit',11)}${l.sent>0&&l.sent>=l.qty?' · <span style="color:var(--ok)">✓ dapur</span>':l.sent>0?' · <span style="color:var(--warn)">+tambahan</span>':''}</div>${l.note?`<div class="lp" style="color:var(--warn);font-style:italic" onclick="editPrice(${i})">📝 ${esc(l.note)}</div>`:''}</div>
@@ -869,19 +871,33 @@ function custModal(){
  panel('Pelanggan','Daftar pelanggan, harga spesial, dan riwayat belanja','<div id="plv"></div>');
  PL.mount('plv');
 }
+/* ---------- Dilayani oleh (karyawan dari Backoffice) ---------- */
+function srvList(){return(db.employees||[]).filter(e=>e&&e.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
+function srvPick(){
+ const l=srvList();if(!l.length){toast('Belum ada karyawan. Tambahkan di Backoffice lalu sinkron.');return}
+ const sel=new Set((S.servers||[]).map(x=>x.id));window._srvSel=sel;
+ openModal(`<h3 style="margin:0 0 4px">Dilayani oleh</h3><div class="mut" style="font-size:13px;margin-bottom:10px">Pilih satu atau lebih. Jika lebih dari satu, komisi nota ini dibagi rata.</div><div id="srvg" style="display:flex;flex-wrap:wrap;gap:8px">${l.map(e=>`<button class="chip ${sel.has(e.id)?'on':''}" data-id="${esc(e.id)}" onclick="srvTog('${esc(e.id)}',this)">${esc(e.name)}${e.role?' <small style="opacity:.7">· '+esc(e.role)+'</small>':''}</button>`).join('')}</div>
+ <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" onclick="closeModal()" style="flex:1">Batal</button><button class="btn" onclick="srvSet([])" style="flex:1">Kosongkan</button><button class="btn pri" onclick="srvSet()" style="flex:1.4">Simpan</button></div>`);
+}
+function srvTog(id,b){const s=window._srvSel;if(s.has(id)){s.delete(id);b.classList.remove('on')}else{s.add(id);b.classList.add('on')}}
+function srvSet(x){
+ const ids=x||[...window._srvSel];
+ S.servers=srvList().filter(e=>ids.includes(e.id)).map(e=>({id:e.id,name:e.name}));
+ closeModal();renderCart();
+}
 function saveOpenBill(){
  if(!S.cart.length){toast('Keranjang kosong');return}
  if(S.meja&&!S.table){toast('Pilih meja dulu');orderInfoModal();return}
  if(S.table&&tableBusy(S.table)){toast(S.table+' sedang dipakai order lain');orderInfoModal();return}
  let o=db.orders.find(x=>x.id===S.orderId);
  if(!o){o={id:uid(),ts:Date.now(),by:S.user.name};db.orders.push(o)}
- Object.assign(o,{items:S.cart,manual:S.manual,vc:S.voucher,pt:S.pts,type:S.type,table:S.table,cust:S.cust,custId:S.custId,channel:S.channel});
+ Object.assign(o,{items:S.cart,manual:S.manual,vc:S.voucher,pt:S.pts,type:S.type,table:S.table,cust:S.cust,custId:S.custId,servers:S.servers||[],channel:S.channel});
  save();resetCart();renderNav();if(S.view!=='pos')renderLeft();toast('Order disimpan');
 }
 function loadOrder(id){
  const o=db.orders.find(x=>x.id===id);if(!o)return;
  if(S.cart.length&&S.orderId!==id&&!confirm('Keranjang saat ini (belum disimpan) akan diganti. Lanjutkan?'))return;
- S.cart=o.items;S.manual=o.manual;S.voucher=o.vc||'';S.pts=o.pt||0;S.type=o.type;S.table=o.table;S.cust=o.cust;S.custId=o.custId||'';S.meja=!!o.table;S.channel=o.channel||'';S.orderId=o.id;S.view='pos';leaveMeja();
+ S.cart=o.items;S.manual=o.manual;S.voucher=o.vc||'';S.pts=o.pt||0;S.type=o.type;S.table=o.table;S.cust=o.cust;S.custId=o.custId||'';S.servers=o.servers||[];S.meja=!!o.table;S.channel=o.channel||'';S.orderId=o.id;S.view='pos';leaveMeja();
  renderMain();
 }
 function delOrder(id){if(confirm('Hapus simpan order ini?')){db.orders=db.orders.filter(o=>o.id!==id);if(S.orderId===id)resetCart();save();renderNav();renderLeft()}}
@@ -1012,7 +1028,7 @@ function finalize(){
  const no='TW-'+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'-'+String(db.seq).padStart(4,'0');
  const change=sum(CK.pays,p=>p.tend-p.ap);
  const kb=CK.pays.some(p=>p.m==='kasbon');
- const t={id:uid(),no,ts:Date.now(),cashier:S.user.name,shiftId:S.shift.id,type:S.type,channel:S.channel,table:S.table,custName:S.cust,customerId:S.custId||'',custWa:(cu&&cu.wa)||(kb?CK.wa.trim():''),
+ const t={id:uid(),no,ts:Date.now(),cashier:S.user.name,shiftId:S.shift.id,type:S.type,channel:S.channel,table:S.table,custName:S.cust,customerId:S.custId||'',servers:(S.servers||[]).map(x=>({id:x.id,name:x.name})),custWa:(cu&&cu.wa)||(kb?CK.wa.trim():''),
   items:items.map(l=>({pid:l.pid,name:l.name,unit:l.unit,qty:l.qty,price:l.price,cogs:l.cogs,refQty:0,base:l.base,note:l.note||'',cat:l.cat||catOf(l.pid)})),
   subtotal:c.sub,custDisc:Math.round(sum(items,l=>{if(l.manual||!l.cp)return 0;const p=db.products.find(x=>x.id===l.pid);if(!p)return 0;const d=p.price-cprice(p);return d>0?Math.max(0,mkPrice(l.base+d)-l.price)*l.qty:0})),autoDisc:c.auto,autoNames:c.names,voucher:c.vcode||'',voucherDisc:c.vch||0,ptUsed:c.ptUsed||0,ptDisc:c.pt||0,ptEarn:(()=>{const L=loyalty();return(L&&cu)?Math.floor(c.net*(1-(c.total>0?Math.min(1,sum(CK.pays.filter(p=>p.m==='komplimen'),p=>p.ap)/c.total):0))/L.earnPer):0})(),manualDisc:c.man,net:c.net,service:c.svc,svcPct:c.svcPct,tax:c.tax,taxPct:c.taxPct,taxIncl:c.taxIncl,rounding:c.rounding,total:c.total,
   payments:CK.pays.map(p=>({...p})),compAmt:sum(CK.pays.filter(p=>p.m==='komplimen'),p=>p.ap),compReason:(CK.pays.find(p=>p.m==='komplimen')||{}).reason||'',compBy:(CK.pays.find(p=>p.m==='komplimen')||{}).by||'',change,customer:kb?{name:CK.name.trim(),wa:CK.wa.trim()}:null,status:'ok',refunded:0};
@@ -1051,6 +1067,7 @@ function receiptText(t){
  const L=[...head(f),lr('No',t.no),lr('Tgl',fmtT(t.ts)),lr('Kasir',t.cashier),lr('Tipe',typeLabel(t.type,t.channel))];
  if(t.table)L.push(lr('Meja',t.table));
  if(t.custName)L.push(lr('Pelanggan',t.custName));
+ if((t.servers||[]).length)L.push(...wrap('Dilayani: '+t.servers.map(x=>x.name).join(', ')));
  L.push(hr);
  t.items.forEach(i=>{L.push(...wrap(i.name));if(i.note)L.push(...wrap('  '+i.note));L.push(lr('  '+fq(i.qty)+' '+i.unit+' x '+num(i.price),num(i.qty*i.price)))});
  L.push(hr,lr('Subtotal',num(t.subtotal)));
@@ -1264,7 +1281,7 @@ function setRP(k){R.p=k;if(k==='custom')defCustom(R);repModal()}
 function histPeriod(k){H.p=k;if(k==='custom')defCustom(H);histModal()}
 function histFiltered(){
  const q=H.q.toLowerCase(),[a,b]=rangeOf(H.p,H.from,H.to);
- let l=db.tx.filter(t=>t.ts>=a&&t.ts<b&&(!q||[t.no,t.cashier,t.custName,t.table,t.customer&&t.customer.name,typeLabel(t.type,t.channel)].join(' ').toLowerCase().includes(q)));
+ let l=db.tx.filter(t=>t.ts>=a&&t.ts<b&&(!q||[t.no,t.cashier,t.custName,t.table,t.customer&&t.customer.name,(t.servers||[]).map(x=>x.name).join(' '),typeLabel(t.type,t.channel)].join(' ').toLowerCase().includes(q)));
  if(H.f==='refund')l=l.filter(t=>t.status!=='ok');
  if(H.f==='kasbon')l=l.filter(t=>t.customer);
  return l.sort((a,b)=>b.ts-a.ts);
@@ -1796,6 +1813,7 @@ async function syncPull(){
    const gone=new Set(r.dels&&r.dels[k]||[]);if(gone.size)db[k]=db[k].filter(o=>!gone.has(o.id));
   });
   if(Array.isArray(r.data.promos)){const mp=new Map((db.promos||[]).map(o=>[o.id,o]));r.data.promos.forEach(o=>{if(o&&o.id)mp.set(o.id,o)});const gp=new Set((r.dels&&r.dels.promos)||[]);const np2=[...mp.values()].filter(o=>!gp.has(o.id));if(JSON.stringify(np2)!==JSON.stringify(db.promos||[])){db.promos=np2;n++}try{renderPromo();renderTotals()}catch(_){}}
+  if(Array.isArray(r.data.employees)){const me=new Map(r.data.employees.filter(o=>o&&o.id).map(o=>[o.id,o])),ge=new Set((r.dels&&r.dels.employees)||[]);const ne=[...me.values()].filter(o=>!ge.has(o.id)).map(o=>({id:o.id,name:o.name,role:o.role||'',active:o.active!==false}));if(JSON.stringify(ne)!==JSON.stringify(db.employees||[])){db.employees=ne;n++}try{renderCart()}catch(_){}}
   ['tx','refunds','shifts','cash'].forEach(k=>db[k].sort((a,b)=>tsOf(k,a)-tsOf(k,b)));
   if(n&&S.user&&S.view==='pos'&&!document.querySelector('.modal,.mback,#modal.on')){try{renderCats();renderGrid()}catch(_){}}
   try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}
