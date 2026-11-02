@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="window.NOXLSX=1"></script>
 <style>
 :root{--bg:#f3f5fb;--card:#fff;--tx:#0b1630;--mut:#6b7893;--pri:#2457f5;--pri2:#1a44cc;--soft:#eaf0ff;--bd:#e3e8f3;--ok:#12a150;--bad:#e5384f;--warn:#d98a06;--sh:0 6px 24px rgba(20,40,100,.08);--r:16px;--hd1:#1a44cc;--hd2:#2f6df5}
@@ -873,7 +874,7 @@ function custModal(){
 }
 /* ---------- Dilayani oleh (karyawan dari Backoffice) ---------- */
 /* ---------- Kunci fitur per klien (data master di Google Sheet milik admin, dicocokkan dengan hash URL script klien) ---------- */
-const MASTER_URL='https://script.google.com/macros/s/AKfycbx5FGMO82d9OIzGrgxp-aezLVSbusfsHH6veu-V_7P7KNb9qfQFyorG86mCZjLd8uHTJw/exec';   // <- tempel URL Web App script MASTER di sini (…/exec)
+const MASTER_URL=(window.TWINS_CFG&&window.TWINS_CFG.master)||'';   // diisi lewat config.js (jangan ubah di sini)
 const FT={on:new Set(),code:'',wa:'',msg:'',nama:'',exp:false};
 const hasF=k=>FT.on.has(k);
 async function urlCode(u){try{const n=String(u||'').trim().split('?')[0].replace(/\/+$/,'').toLowerCase();if(!n||!(window.crypto&&crypto.subtle))return'';const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(n));return[...new Uint8Array(b)].slice(0,6).map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return''}}
