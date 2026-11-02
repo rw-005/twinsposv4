@@ -442,9 +442,9 @@ function defDB(){return{
   {id:'p7',name:'Kabel Listrik',cat:'Alat',unit:'meter',price:5000,cogs:3000,stock:200,barcode:'8999007',photo:''}
  ],
  discounts:[{id:'d1',name:'Happy Hour Sore',type:'pct',value:10,days:[1,2,3,4,5],start:'14:00',end:'16:00',on:true}],
- tx:[],refunds:[],shifts:[],orders:[],cash:[],customers:[]
+ tx:[],refunds:[],shifts:[],orders:[],cash:[],customers:[],cgroups:[]
 }}
-let db=(function(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.staff){const x=defDB();d.settings={...x.settings,...d.settings};const dp=defPrint(),sp=d.settings.print||{};d.settings.print={receipt:{...dp.receipt,...sp.receipt},kitchen:{...dp.kitchen,...sp.kitchen},checker:{...dp.checker,...sp.checker},bar:{...dp.bar,...sp.bar}};const dq=defOnline(),so=d.settings.online||{};d.settings.online={shopee:{...dq.shopee,...so.shopee},grab:{...dq.grab,...so.grab},gofood:{...dq.gofood,...so.gofood}};if(!d.v3){d.v3=1;d.settings.tableMode=true}['orders','refunds','tx','shifts','discounts','products','cash','customers'].forEach(k=>{if(!d[k])d[k]=[]});d.rseq=d.rseq||0;return d}}catch(e){}return defDB()})();
+let db=(function(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.staff){const x=defDB();d.settings={...x.settings,...d.settings};const dp=defPrint(),sp=d.settings.print||{};d.settings.print={receipt:{...dp.receipt,...sp.receipt},kitchen:{...dp.kitchen,...sp.kitchen},checker:{...dp.checker,...sp.checker},bar:{...dp.bar,...sp.bar}};const dq=defOnline(),so=d.settings.online||{};d.settings.online={shopee:{...dq.shopee,...so.shopee},grab:{...dq.grab,...so.grab},gofood:{...dq.gofood,...so.gofood}};if(!d.v3){d.v3=1;d.settings.tableMode=true}['orders','refunds','tx','shifts','discounts','products','cash','customers','cgroups'].forEach(k=>{if(!d[k])d[k]=[]});d.rseq=d.rseq||0;return d}}catch(e){}return defDB()})();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){toast('Penyimpanan penuh! Kurangi foto produk atau ekspor data.')}try{syncSoon()}catch(_){}}
 const S={user:null,shift:null,cart:[],manual:{type:'pct',val:0},cat:'Semua',q:'',view:'pos',type:'take',table:'',cust:'',orderId:null,custId:'',meja:false,channel:'',pmode:'grid',lastPm:'grid'};
 S.navOpen=(()=>{try{const v=localStorage.getItem('twinspos_nav');if(v!==null)return v==='1'}catch(e){}return !(window.innerWidth<=800&&window.innerHeight>window.innerWidth)})();
@@ -1600,11 +1600,11 @@ const SYN={
  cash:{h:['Tanggal','Jenis','Kategori','Nominal','Sumber','Catatan','Dicatat Oleh'],r:x=>[fmtDT(x.ts),x.type==='out'?'Pengeluaran':'Uang Masuk',x.cat,x.amount,x.src==='laci'?'Laci kas':'Di luar laci',x.note||'',x.by]},
  products:{h:['Nama','Kategori','Satuan','Harga Jual','Harga Modal','Stok','Barcode','Varian','Topping'],r:p=>[p.name,p.cat,p.unit,p.price,p.cogs,p.notrack?'':p.stock,p.barcode||'',fmtOpts(p.variants,'; '),fmtOpts(p.toppings,'; ')]}
 };
-if(window.PL)SYN.customers={h:PL.HEAD,r:PL.row};
+if(window.PL){SYN.customers={h:PL.HEAD,r:PL.row};SYN.cgroups={h:PL.GHEAD,r:PL.grow}}
 /* produk: foto tidak dikirim (terlalu besar); stok tidak ikut memicu kirim ulang */
 function synJ(k,o){if(k!=='products')return JSON.stringify(o);const c={...o};delete c.photo;return JSON.stringify(c)}
 function synH(k,o){if(k!=='products')return hsh(JSON.stringify(o));const c={...o};delete c.photo;delete c.stock;delete c.base;return hsh(JSON.stringify(c))}
-const tsOf=(k,o)=>k==='shifts'?o.openTs:k==='products'?(o.upd||0):k==='customers'?(o.upd||o.ts||0):o.ts;
+const tsOf=(k,o)=>k==='shifts'?o.openTs:k==='products'?(o.upd||0):(k==='customers'||k==='cgroups')?(o.upd||o.ts||0):o.ts;
 function hsh(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return s.length+':'+h}
 function stkQ(pid,name,d,k){d=+(+d).toFixed(3);if(!d||!syOn())return;SY.sd.push({id:uid(),pid:pid,name:name,d:d,k:k,ts:Date.now(),by:S.user?S.user.name:''});sySave()}
 function stkPend(pid){return +sum(SY.sd.filter(x=>x.pid===pid),x=>x.d).toFixed(3)}
@@ -1664,7 +1664,7 @@ async function syncPull(){
     if(l&&k==='tx'&&(o.refunded||0)>(l.refunded||0))take=true;
     if(l&&k==='shifts'&&o.closeTs&&!l.closeTs)take=true;
     if(l&&k==='products'&&(o.upd||0)>(l.upd||0))take=true;
-    if(l&&k==='customers'&&(o.upd||0)>(l.upd||0))take=true;
+    if(l&&(k==='customers'||k==='cgroups')&&(o.upd||0)>(l.upd||0))take=true;
     if(l&&k==='products'&&o.sk&&!o.notrack&&!l.notrack){const ns=+((+o.stock||0)+stkPend(o.id)).toFixed(3);if(ns!==l.stock){l.stock=ns;n++;np++}}
     if(!take)return;
     if(k==='products')o=Object.assign({},o,{photo:l?(l.photo||''):'',stock:l?l.stock:(+o.stock||0),base:l?l.base:o.base,variants:o.variants||[],toppings:o.toppings||[]});
@@ -2020,9 +2020,11 @@ function optAdd(){
 }
 
 if(window.PL)PL.init({
- data:()=>({customers:db.customers,products:db.products,tx:db.tx}),
+ data:()=>({customers:db.customers,groups:db.cgroups,products:db.products,tx:db.tx}),
  save:async c=>{const i=db.customers.findIndex(x=>x.id===c.id);if(i>=0)db.customers[i]=c;else db.customers.push(c);save();if(S.custId===c.id){S.cust=c.name;applyChannel();renderCart()}toast('Pelanggan tersimpan')},
  del:async id=>{db.customers=db.customers.filter(x=>x.id!==id);syncDel('customers',id);if(S.custId===id){S.custId='';S.cust='';applyChannel();renderCart()}save();toast('Pelanggan dihapus')},
+ saveGroup:async g=>{const i=db.cgroups.findIndex(x=>x.id===g.id);if(i>=0)db.cgroups[i]=g;else db.cgroups.push(g);save();applyChannel();renderCart();toast('Grup tersimpan')},
+ delGroup:async id=>{db.cgroups=db.cgroups.filter(x=>x.id!==id);syncDel('cgroups',id);save();applyChannel();renderCart();toast('Grup dihapus')},
  openDlg:(h,w)=>openModal(h,w),back:()=>custModal(),
  canPrice:()=>!!S.user&&S.user.role!=='kasir',
  guardDel:(fn,back)=>verifyPin(['owner','supervisor'],'Hapus Pelanggan',fn,back),
