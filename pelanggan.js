@@ -6,6 +6,8 @@
  * Data pelanggan: {id,name,wa,address,note,discPct,sp:{idProduk:harga},active,ts,upd}
  *  - discPct : diskon otomatis (%) untuk semua produk pelanggan ini
  *  - sp      : harga khusus per produk (didahulukan dari discPct)
+ *  - groupId : id grup pelanggan (harga grup dipakai bila pelanggan tidak punya harga sendiri)
+ * Grup: {id,name,discPct,sp,ts,upd}. Urutan harga: harga khusus pelanggan > diskon pelanggan > harga khusus grup > diskon grup > normal.
  */
 (function () {
 'use strict';
@@ -32,13 +34,19 @@ PL.validWA = n => { n = normWA(n); return n.length >= 10 && n.length <= 15; };
 PL.HEAD = ['Nama', 'WhatsApp', 'Alamat', 'Catatan', 'Diskon %', 'Harga Khusus', 'Aktif'];
 PL.row = c => [c.name, c.wa || '', c.address || '', c.note || '', c.discPct || 0, Object.keys(c.sp || {}).length, c.active === false ? 'Tidak' : 'Ya'];
 
-/* ---------- harga pelanggan: harga khusus produk > diskon % > harga normal ---------- */
+PL.GHEAD = ['Nama', 'Diskon %', 'Harga Khusus'];   // sheet GrupPelanggan (harus sama dengan HEAD_GRP di Code.gs)
+PL.grow = g => [g.name, g.discPct || 0, Object.keys(g.sp || {}).length];
+
+/* ---------- harga pelanggan: harga khusus pelanggan > diskon pelanggan > harga khusus grup > diskon grup > normal ---------- */
+const groups = () => (cfg && cfg.data().groups) || [];
+const grpOf = c => (c && c.groupId) ? (groups().find(x => x.id === c.groupId) || null) : null;
 PL.priceFor = function (c, p) {
   if (!c || !p) return p ? p.price : 0;
-  const sp = c.sp && c.sp[p.id];
-  if (sp !== undefined && sp !== null && sp !== '' && !isNaN(+sp)) return Math.max(0, +sp);
-  const d = +c.discPct || 0;
-  return d > 0 ? Math.max(0, Math.round(p.price * (1 - Math.min(d, 100) / 100))) : p.price;
+  const pick = o => { const sp = o && o.sp && o.sp[p.id]; return (sp !== undefined && sp !== null && sp !== '' && !isNaN(+sp)) ? Math.max(0, +sp) : null; };
+  const disc = o => { const d = +(o && o.discPct) || 0; return d > 0 ? Math.max(0, Math.round(p.price * (1 - Math.min(d, 100) / 100))) : null; };
+  const g = grpOf(c);
+  let v = pick(c); if (v === null) v = disc(c); if (v === null) v = pick(g); if (v === null) v = disc(g);
+  return v === null ? p.price : v;
 };
 
 /* ---------- laporan per pelanggan ---------- */
@@ -90,7 +98,7 @@ function css() {
 
 PL.init = function (c) { cfg = c; css(); };
 const find = id => cfg.data().customers.find(x => x.id === id);
-const badges = c => (c.active === false ? '<span class="badge v">Nonaktif</span> ' : '') +
+const badges = c => (c.active === false ? '<span class="badge v">Nonaktif</span> ' : '') + (grpOf(c) ? '<span class="badge">Grup ' + esc(grpOf(c).name) + '</span> ' : '') +
   (+c.discPct > 0 ? '<span class="badge g">Diskon ' + fq(c.discPct) + '%</span> ' : '') +
   (Object.keys(c.sp || {}).length ? '<span class="badge k">Harga khusus ' + Object.keys(c.sp).length + '</span>' : '');
 const uid = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -105,8 +113,8 @@ PL.mount = function (id) {
     '<div class="kc"><small>Total belanja pelanggan</small><b>' + rp(sum(all, s => s.total)) + '</b></div></div>' +
     (cfg.periodLabel ? '<div class="mut" style="font-size:13px;margin-bottom:8px">Periode: ' + esc(cfg.periodLabel()) + '</div>' : '') +
     '<div class="pl-tool"><input id="pl_q" placeholder="Cari nama, no. WA, alamat…" value="' + esc(ST.q) + '" oninput="PL.setQ(this.value)" autocomplete="off">' +
-    '<select onchange="PL.setF(this.value)">' + [['all', 'Semua'], ['on', 'Aktif'], ['off', 'Nonaktif'], ['sp', 'Punya harga khusus']].map(x => '<option value="' + x[0] + '"' + (ST.f === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select>' +
-    '<button class="btn" onclick="PL.exp()">CSV</button><button class="btn pri" onclick="PL.edit()">+ Pelanggan</button></div><div id="pl_list"></div>';
+    '<select onchange="PL.setF(this.value)">' + [['all', 'Semua'], ['on', 'Aktif'], ['off', 'Nonaktif'], ['sp', 'Punya harga khusus']].concat(groups().map(g => ['g:' + g.id, 'Grup ' + g.name])).map(x => '<option value="' + x[0] + '"' + (ST.f === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select>' +
+    '<button class="btn" onclick="PL.groups()">Grup</button><button class="btn" onclick="PL.exp()">CSV</button><button class="btn pri" onclick="PL.edit()">+ Pelanggan</button></div><div id="pl_list"></div>';
   rows();
 };
 PL.setQ = v => { ST.q = v; rows(); };
@@ -114,7 +122,7 @@ PL.setF = v => { ST.f = v; rows(); };
 function filtered() {
   const d = cfg.data(), by = index(d), rg = cfg.range ? cfg.range() : [0, Infinity], q = ST.q.trim().toLowerCase();
   return d.customers.map(c => ({c, s: summ(by[c.id] || [], rg[0], rg[1])})).filter(x =>
-    (ST.f === 'all' || (ST.f === 'on' && x.c.active !== false) || (ST.f === 'off' && x.c.active === false) || (ST.f === 'sp' && (+x.c.discPct > 0 || Object.keys(x.c.sp || {}).length))) &&
+    (ST.f === 'all' || (ST.f === 'on' && x.c.active !== false) || (ST.f === 'off' && x.c.active === false) || (ST.f === 'sp' && (+x.c.discPct > 0 || Object.keys(x.c.sp || {}).length)) || (ST.f.startsWith('g:') && x.c.groupId === ST.f.slice(2))) &&
     (!q || (x.c.name + ' ' + (x.c.wa || '') + ' ' + (x.c.address || '')).toLowerCase().includes(q))
   ).sort((x, y) => y.s.total - x.s.total || String(x.c.name).localeCompare(String(y.c.name)));
 }
@@ -128,8 +136,8 @@ function rows() {
 }
 PL.exp = function () {
   const l = filtered();
-  cfg.export('Pelanggan', [['Nama', 'WhatsApp', 'Alamat', 'Catatan', 'Diskon %', 'Jumlah Harga Khusus', 'Jumlah Nota', 'Total Belanja', 'Terakhir Belanja', 'Status'],
-    ...l.map(x => [x.c.name, x.c.wa || '', x.c.address || '', x.c.note || '', x.c.discPct || 0, Object.keys(x.c.sp || {}).length, x.s.n, Math.round(x.s.total), x.s.last ? fmtT(x.s.last) : '', x.c.active === false ? 'Nonaktif' : 'Aktif'])]);
+  cfg.export('Pelanggan', [['Nama', 'WhatsApp', 'Alamat', 'Catatan', 'Grup', 'Diskon %', 'Jumlah Harga Khusus', 'Jumlah Nota', 'Total Belanja', 'Terakhir Belanja', 'Status'],
+    ...l.map(x => [x.c.name, x.c.wa || '', x.c.address || '', x.c.note || '', grpOf(x.c) ? grpOf(x.c).name : '', x.c.discPct || 0, Object.keys(x.c.sp || {}).length, x.s.n, Math.round(x.s.total), x.s.last ? fmtT(x.s.last) : '', x.c.active === false ? 'Nonaktif' : 'Aktif'])]);
 };
 
 /* =================== DETAIL & LAPORAN PELANGGAN =================== */
@@ -151,7 +159,7 @@ PL.open = function (id, p) {
     '<div class="pl-kpis"><div class="kc"><small>Total belanja</small><b>' + rp(s.total) + '</b></div><div class="kc"><small>Jumlah nota</small><b>' + s.n + '</b></div>' +
     '<div class="kc"><small>Rata-rata per nota</small><b>' + rp(s.avg) + '</b></div><div class="kc"><small>Terakhir belanja</small><b style="font-size:15px">' + (s.last ? fmtT(s.last) : '—') + '</b></div>' +
     (s.kasbon ? '<div class="kc"><small>Kasbon tercatat</small><b style="color:var(--warn)">' + rp(s.kasbon) + '</b></div>' : '') + '</div>' +
-    ((spl.length || +c.discPct > 0) ? '<div class="pl-h">Harga spesial</div>' + (+c.discPct > 0 ? '<div class="pl-hint">Diskon otomatis ' + fq(c.discPct) + '% untuk semua produk (kecuali yang punya harga khusus di bawah).</div>' : '') +
+    ((spl.length || +c.discPct > 0 || grpOf(c)) ? '<div class="pl-h">Harga spesial</div>' + (grpOf(c) ? '<div class="pl-hint">Grup <b>' + esc(grpOf(c).name) + '</b>: ' + (+grpOf(c).discPct > 0 ? 'diskon ' + fq(grpOf(c).discPct) + '%' : 'tanpa diskon %') + ', ' + Object.keys(grpOf(c).sp || {}).length + ' harga khusus. Dipakai untuk produk yang tidak punya harga sendiri di bawah.</div>' : '') + (+c.discPct > 0 ? '<div class="pl-hint">Diskon otomatis ' + fq(c.discPct) + '% untuk semua produk (kecuali yang punya harga khusus di bawah).</div>' : '') +
       (spl.length ? '<table class="pl-t"><tr><th>Produk</th><th class="r">Normal</th><th class="r">Pelanggan ini</th></tr>' + spl.map(x => '<tr><td>' + esc(x[0].name) + '</td><td class="r">' + rp(x[0].price) + '</td><td class="r"><b>' + rp(x[1]) + '</b></td></tr>').join('') + '</table>' : '') : '') +
     '<div class="pl-h">Produk yang dibeli</div>' + (prod.length ? '<div style="overflow-x:auto"><table class="pl-t"><tr><th>Produk</th><th class="r">Jumlah</th><th class="r">Nilai</th></tr>' + prod.map(x => '<tr><td>' + esc(x[0]) + '</td><td class="r">' + fq(x[1].q) + ' ' + esc(x[1].unit) + '</td><td class="r">' + rp(x[1].rev) + '</td></tr>').join('') + '</table></div>' : '<div class="pl-empty">Belum ada pembelian pada periode ini</div>') +
     '<div class="pl-h">Riwayat nota</div>' + (s.r.length ? '<div style="overflow-x:auto"><table class="pl-t"><tr><th>Nota</th><th>Waktu</th><th class="r">Total</th></tr>' + [...s.r].sort((x, y) => y.ts - x.ts).slice(0, 40).map(t =>
@@ -204,8 +212,9 @@ PL.edit = function (id, opts) {
     '<div class="pl-hint">Dipakai untuk mengirim struk lewat WhatsApp.</div>' +
     '<label>Alamat</label><input id="pl_a" value="' + esc(c.address) + '" autocomplete="off">' +
     (opts.quick ? '' : '<label>Catatan (opsional)</label><input id="pl_c" value="' + esc(c.note) + '" autocomplete="off"><label>Status</label><select id="pl_s"><option value="1"' + (c.active !== false ? ' selected' : '') + '>Aktif</option><option value="0"' + (c.active === false ? ' selected' : '') + '>Nonaktif</option></select>') +
-    (opts.quick ? '' : F.canP ? '<div class="pl-h">Harga spesial</div><div class="pl-hint">Harga khusus per produk didahulukan. Produk lain memakai diskon otomatis di bawah (kosongkan bila tidak ada).</div>' +
-      '<label>Diskon otomatis (%)</label><input id="pl_d" type="number" inputmode="decimal" step="any" min="0" max="100" value="' + esc(c.discPct || '') + '" placeholder="0">' +
+    (opts.quick ? '' : F.canP ? '<div class="pl-h">Harga spesial</div><div class="pl-hint">Urutan: harga khusus pelanggan, diskon pelanggan, lalu harga grup. Kosongkan yang tidak dipakai.</div>' +
+      '<label>Grup pelanggan</label><select id="pl_g"><option value="">Tanpa grup</option>' + groups().map(g => '<option value="' + g.id + '"' + (c.groupId === g.id ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') + '</select>' +
+      '<label>Diskon otomatis pelanggan ini (%)</label><input id="pl_d" type="number" inputmode="decimal" step="any" min="0" max="100" value="' + esc(c.discPct || '') + '" placeholder="0">' +
       '<label>Harga khusus per produk</label><div id="pl_spw">' + spHTML() + '</div>'
       : '<div class="pl-hint" style="margin-top:12px">Harga spesial hanya bisa diubah oleh Supervisor / Owner.</div>') +
     '<div class="pl-err" id="pl_err"></div>' +
@@ -224,6 +233,7 @@ PL.save = async function () {
   const c = {
     id: F.id || uid(), name, wa: digits(wa), address: val('pl_a').trim(), note: F.opts.quick ? (o.note || '') : val('pl_c').trim(),
     active: F.opts.quick ? o.active !== false : val('pl_s') !== '0',
+    groupId: F.canP ? val('pl_g') : (o.groupId || ''),
     discPct: F.canP ? Math.min(100, Math.max(0, +val('pl_d') || 0)) : (o.discPct || 0),
     sp: F.canP ? Object.fromEntries(Object.entries(F.sp).filter(x => !isNaN(+x[1]) && +x[1] >= 0)) : (o.sp || {}),
     ts: o.ts || Date.now(), upd: Date.now()
@@ -237,6 +247,46 @@ PL.del = function (id) {
   if (!confirm('Hapus pelanggan “' + c.name + '”? Riwayat nota tetap tersimpan, tetapi tidak lagi terhubung ke pelanggan ini. (Untuk menyembunyikan saja, ubah status jadi Nonaktif.)')) return;
   const go = async () => { try { await cfg.del(id); } catch (e) { alert('Gagal menghapus: ' + (e && e.message || e)); } cfg.back(); };
   cfg.guardDel ? cfg.guardDel(go, () => PL.edit(id)) : go();
+};
+
+/* =================== GRUP PELANGGAN =================== */
+PL.groups = function () {
+  const d = cfg.data(), gs = groups().slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const canP = !cfg.canPrice || cfg.canPrice();
+  cfg.openDlg('<h3>Grup Pelanggan</h3><div class="pl-hint">Atur diskon dan harga khusus sekali untuk satu grup (mis. Reseller, Langganan). Pelanggan di grup itu otomatis memakai harga grup, kecuali punya harga sendiri.</div>' +
+    (gs.length ? gs.map(g => {
+      const n = d.customers.filter(c => c.groupId === g.id).length;
+      return '<div class="pl-row"' + (canP ? ' onclick="PL.gEdit(\'' + g.id + '\')"' : '') + '><div class="pl-av">' + esc(ini(g.name)) + '</div><div class="pl-mn"><b>' + esc(g.name) + '</b><small>' + n + ' pelanggan · ' + Object.keys(g.sp || {}).length + ' harga khusus</small></div><div class="pl-vl">' + (+g.discPct > 0 ? fq(g.discPct) + '%' : '—') + '<small>diskon</small></div></div>';
+    }).join('') : '<div class="pl-empty">Belum ada grup.</div>') +
+    (canP ? '' : '<div class="pl-hint" style="margin-top:10px">Grup hanya bisa diubah oleh Supervisor / Owner.</div>') +
+    '<div class="pl-act"><button class="btn" onclick="PL.close()">Tutup</button>' + (canP ? '<button class="btn pri" onclick="PL.gEdit()">+ Grup</button>' : '') + '</div>');
+};
+PL.gEdit = function (id) {
+  const g = (id && groups().find(x => x.id === id)) || {sp: {}, discPct: 0};
+  F = {id: id || '', sp: Object.assign({}, g.sp || {}), old: g, canP: true, group: true, opts: {back: () => PL.groups()}};
+  cfg.openDlg('<h3>' + (id ? 'Ubah' : 'Tambah') + ' Grup</h3><label>Nama grup *</label><input id="pl_gn" value="' + esc(g.name) + '" placeholder="mis. Reseller" autocomplete="off">' +
+    '<label>Diskon otomatis (%)</label><input id="pl_d" type="number" inputmode="decimal" step="any" min="0" max="100" value="' + esc(g.discPct || '') + '" placeholder="0">' +
+    '<label>Harga khusus per produk</label><div id="pl_spw">' + spHTML() + '</div><div class="pl-err" id="pl_err"></div>' +
+    '<div class="pl-act"><button class="btn" onclick="PL.groups()">Batal</button>' + (id ? '<button class="btn" style="color:var(--bad)" onclick="PL.gDel(\'' + id + '\')">Hapus</button>' : '') + '<button class="btn pri" id="pl_sv" onclick="PL.gSave()">Simpan</button></div>');
+  setTimeout(() => { const e = $('pl_gn'); if (e && !id) e.focus(); }, 60);
+};
+PL.gSave = async function () {
+  const name = val('pl_gn').trim(), o = F.old;
+  if (!name) { err('Isi nama grup'); return; }
+  if (groups().some(x => x.id !== F.id && String(x.name).toLowerCase() === name.toLowerCase())) { err('Nama grup sudah dipakai'); return; }
+  const g = {id: F.id || 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name,
+    discPct: Math.min(100, Math.max(0, +val('pl_d') || 0)),
+    sp: Object.fromEntries(Object.entries(F.sp).filter(x => !isNaN(+x[1]) && +x[1] >= 0)), ts: o.ts || Date.now(), upd: Date.now()};
+  const b = $('pl_sv'); if (b) b.disabled = true;
+  try { await cfg.saveGroup(g); } catch (e) { err('Gagal menyimpan: ' + (e && e.message || e)); if (b) b.disabled = false; return; }
+  PL.groups();
+};
+PL.gDel = async function (id) {
+  const g = groups().find(x => x.id === id); if (!g) return;
+  const n = cfg.data().customers.filter(c => c.groupId === id).length;
+  if (!confirm('Hapus grup “' + g.name + '”?' + (n ? '\n' + n + ' pelanggan di grup ini akan kembali ke harga normal (kecuali punya harga sendiri).' : ''))) return;
+  try { await cfg.delGroup(id); } catch (e) { alert('Gagal menghapus: ' + (e && e.message || e)); }
+  PL.groups();
 };
 
 /* =================== PEMILIH PELANGGAN (dipakai kasir) =================== */
