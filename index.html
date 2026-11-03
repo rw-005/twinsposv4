@@ -431,7 +431,7 @@ const typeLabel=(t,ch)=>t==='online'?(CH[ch]||'Online'):t==='dine'?'Dine In':'Ta
 function defDB(){return{
  theme:'light',seq:0,rseq:0,v3:1,
  settings:{name:'Toko Twins',address:'Jl. Contoh No. 1, Jakarta',wa:'081234567890',footer:'Terima kasih atas kunjungan Anda!',paper:'58',
-  servicePct:0,serviceDineOnly:true,taxPct:0,taxMode:'excl',roundUnit:0,roundMode:'nearest',tableMode:true,
+  servicePct:0,serviceDineOnly:true,taxPct:0,taxMode:'excl',roundUnit:0,roundMode:'nearest',tableMode:true,cashCount:true,loginMode:'tutup',
   tables:['Meja 1','Meja 2','Meja 3','Meja 4','Meja 5','Meja 6','Meja 7','Meja 8'],print:defPrint(),online:defOnline(),cashCats:defCats()},
  staff:[{id:'s1',name:'Owner',role:'owner',pin:'123456'},{id:'s2',name:'Supervisor',role:'supervisor',pin:'123456'},{id:'s3',name:'Kasir 1',role:'kasir',pin:'123456'}],
  products:[
@@ -459,6 +459,19 @@ function openModal(html,wide,cls){$('#modal').style.padding='';$('#sheet').class
 function panel(title,sub,body){openModal(`<div class="ph-head"><button class="ib bk" onclick="closeSet()" aria-label="Kembali">${ic('back',20)}</button><div style="flex:1;min-width:0"><h3>${title}</h3>${sub?`<div class="sub">${sub}</div>`:''}</div><button class="ib" onclick="closeSet()" aria-label="Tutup">${ic('x',20)}</button></div><div class="ph-body">${body}</div>`,true,'panel')}
 const card=(t,d,inner,acts)=>`<div class="card"><div class="ch"><div><h4>${t}</h4>${d?`<p>${d}</p>`:''}</div>${acts||''}</div>${inner}</div>`;
 const fld=(l,inner,full)=>`<div class="f${full?' full':''}"><label>${l}</label>${inner}</div>`;
+const CC=()=>db.settings.cashCount!==false;
+const LM=()=>db.settings.loginMode==='ganti'?'ganti':'tutup';
+const SESSK=KEY+'_sess';
+const NAT0=()=>{try{const C=window.Capacitor;return C&&C.isNativePlatform&&C.isNativePlatform()&&C.Plugins&&C.Plugins.TwinsPrinter||null}catch(e){return null}};
+/* Chrome: login hanya diingat selama tab hidup (sessionStorage). APK: disimpan di perangkat, tapi dipakai lagi hanya bila Android memulihkan aplikasi (bukan start baru/HP restart) */
+const SST=()=>NAT0()?localStorage:sessionStorage;
+function sessSave(){try{SST().setItem(SESSK,JSON.stringify({u:S.user.id,s:S.shift.id}))}catch(e){}}
+function sessClear(){try{localStorage.removeItem(SESSK)}catch(e){}try{sessionStorage.removeItem(SESSK)}catch(e){}}
+function sessRestore(){try{const j=JSON.parse(SST().getItem(SESSK)||'null');if(!j)return false;const st=db.staff.find(x=>x.id===j.u),sh=db.shifts.find(x=>x.id===j.s&&x.staffId===j.u&&!x.closeTs);if(!st||!sh){sessClear();return false}S.user=st;S.shift=sh;S.cat='Semua';S.q='';S.view='pos';resetCart();try{syncAuto()}catch(_){}return true}catch(e){return false}}
+function gantiKasir(){
+ if(S.cart.length&&!confirm('Keranjang yang belum dibayar akan dikosongkan (gunakan Simpan Order bila perlu). Tetap ganti kasir?'))return;
+ sessClear();S.user=null;S.shift=null;resetCart();renderLock();
+}
 const selOpt=(v,arr)=>arr.map(([a,b])=>`<option value="${a}" ${String(a)===String(v)?'selected':''}>${b}</option>`).join('');
 function closeModal(){$('#modal').classList.remove('on');$('#sheet').innerHTML=''}
 function toggleTheme(){db.theme=db.theme==='dark'?'light':'dark';save();document.documentElement.dataset.theme=db.theme;const b=$('#thb');if(b)b.innerHTML=ic(db.theme==='dark'?'sun':'moon',20)}
@@ -472,7 +485,7 @@ const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
 const ini=n=>{const w=String(n||'').trim().split(/\s+/).filter(Boolean);if(!w.length)return'?';return(w.length>1?Array.from(w[0])[0]+Array.from(w[1])[0]:Array.from(w[0]).slice(0,2).join('')).toUpperCase()};
 
 /* ---------- lock ---------- */
-function renderApp(){document.documentElement.dataset.theme=db.theme;S.user?renderMain():renderLock()}
+function renderApp(){document.documentElement.dataset.theme=db.theme;if(!S.user)sessRestore();S.user?renderMain():renderLock()}
 function renderLock(){
  $('#app').innerHTML=`<div class="lock"><div class="lockbox"><div class="logo">TWINS<span>POS</span></div><p class="mut" style="margin:6px 0 14px">Layar terkunci · Buka shift</p>
  <label>Nama Staf</label><select id="lk_s" onchange="lockSel()">${db.staff.map(s=>`<option value="${s.id}">${esc(s.name)} (${ROLES[s.role]})</option>`).join('')}</select>
@@ -485,7 +498,7 @@ function renderLock(){
 }
 function lockSel(){
  const id=$('#lk_s').value,open=db.shifts.find(s=>s.staffId===id&&!s.closeTs);
- $('#lk_mw').style.display=open?'none':'block';
+ $('#lk_mw').style.display=(open||!CC())?'none':'block';
  $('#lk_e').style.color=open?'var(--ok)':'';
  $('#lk_e').textContent=open?'Shift berjalan sejak '+fmtT(open.openTs)+' akan dilanjutkan.':'';
 }
@@ -495,11 +508,11 @@ function doLogin(){
  if($('#lk_p').value!==st.pin){$('#lk_e').style.color='var(--bad)';$('#lk_e').textContent='PIN salah.';$('#lk_p').value='';return}
  let sh=db.shifts.find(s=>s.staffId===st.id&&!s.closeTs);
  if(!sh){
-  const m=parseFloat($('#lk_m').value);
+  const m=CC()?parseFloat($('#lk_m').value):0;
   sh={id:uid(),staffId:st.id,name:st.name,openTs:Date.now(),modal:isNaN(m)?0:Math.max(0,m)};
   db.shifts.push(sh);save();
  }
- S.user=st;S.shift=sh;S.cat='Semua';S.q='';S.view='pos';
+ S.user=st;S.shift=sh;S.cat='Semua';S.q='';S.view='pos';sessSave();
  resetCart();renderMain();
  try{syncAuto()}catch(_){}
 }
@@ -668,7 +681,7 @@ function renderNav(){
  const sb=$('#soBtn'),sn=$('#soN');
  if(sb&&sn){const c=db.orders.length;sn.textContent=c||'';sn.style.display=c?'':'none';sb.classList.toggle('has',c>0)}
  const n=$('#nav');if(!n)return;
- const it=[['pos','grid','Kasir'],['orders','file','Simpan Order',db.orders.length],['hist','clock','Riwayat Penjualan'],['cust','user','Pelanggan'],['kas','wallet','Kas'],['rep','chart','Laporan Penjualan'],['inv','box','Produk & Inventory'],['set','sliders','Pengaturan'],['tutup','power','Tutup Kasir']];
+ const it=[['pos','grid','Kasir'],['orders','file','Simpan Order',db.orders.length],['hist','clock','Riwayat Penjualan'],['cust','user','Pelanggan'],['kas','wallet','Kas'],['rep','chart','Laporan Penjualan'],['inv','box','Produk & Inventory'],['set','sliders','Pengaturan'],...(LM()==='ganti'?[['ganti','user','Ganti Kasir']]:[]),['tutup','power','Tutup Kasir']];
  n.innerHTML=it.map(([k,i,l,b])=>`<button class="nv ${k==='tutup'?'tutup':S.view===k?'on':''}" onclick="nav('${k}')">${ic(i,22)}<span>${l}</span>${b?`<em>${b}</em>`:''}</button>`).join('')+`<a class="navsvc" href="https://wa.me/6285695165552" target="_blank" rel="noopener">${ic('chat',22)}<b>Layanan</b><span>Hubungi WA<br>0856 9516 5552</span></a>`;
 }
 function nav(k){
@@ -678,6 +691,7 @@ function nav(k){
  if(k==='rep')return ownerGate('rep');
  if(k==='inv')return setModal('menu');
  if(k==='set')return setModal('outlet');
+ if(k==='ganti')return gantiKasir();
  if(k==='tutup')return closeShiftModal();
  S.view=k;renderNav();renderLeft();
 }
@@ -1148,7 +1162,7 @@ async function printJobs(jobs){
  for(const j of jobs){
   const c=pcfg(j.kind),w=c.paper==='80'?'80mm':'58mm';
   $('#printArea').innerHTML=Array.from({length:Math.max(1,c.copies|0)},()=>'<pre style="width:'+w+'">'+esc(j.txt)+'</pre>').join('');
-  await new Promise(r=>setTimeout(r,150));window.print();await new Promise(r=>setTimeout(r,500));
+  await new Promise(r=>setTimeout(r,150));(window.NATPRINT?window.NATPRINT():window.print());await new Promise(r=>setTimeout(r,500));
  }
 }
 function printText(txt,kind){printJobs([{txt,kind:kind||'receipt'}])}
@@ -1375,22 +1389,22 @@ function shiftCalc(sh){
 const DEN=[[100000,'Rp100.000'],[50000,'Rp50.000'],[20000,'Rp20.000'],[10000,'Rp10.000'],[5000,'Rp5.000'],[2000,'Rp2.000'],[1000,'Rp1.000'],[1000,'Koin 1.000'],[500,'Koin 500'],[200,'Koin 200'],[100,'Koin 100']];
 function closeShiftModal(){
  if(S.cart.length&&!confirm('Masih ada barang di keranjang yang belum dibayar. Tetap tutup kasir?'))return;
- const c=shiftCalc(S.shift);
+ const c=shiftCalc(S.shift);window._cash=null;
  openModal(`<h3>Tutup Kasir</h3>
  <div class="cards"><div class="kpi"><small>Modal awal</small><b>${rp(S.shift.modal)}</b></div><div class="kpi"><small>Penjualan tunai</small><b>${rp(c.by.tunai)}</b></div><div class="kpi"><small>Refund tunai</small><b>${rp(c.rby.tunai)}</b></div><div class="kpi"><small>Uang masuk lain</small><b>${rp(c.cin)}</b></div><div class="kpi"><small>Pengeluaran kas</small><b>${rp(c.cout)}</b></div><div class="kpi"><small>Kas seharusnya</small><b>${rp(c.expected)}</b></div></div>
  ${db.orders.length?`<div class="promo">Ada ${db.orders.length} simpan order yang belum dibayar. Simpan order tidak ikut tertutup.</div>`:''}
- <b>Hitung uang fisik di laci</b>
- <table>${DEN.map(([v,n])=>`<tr><td>${n}</td><td style="width:100px"><input class="dn" data-v="${v}" type="number" inputmode="numeric" min="0" placeholder="0" oninput="cashCalc(${c.expected})"></td></tr>`).join('')}
- <tr><td>Lain-lain (Rp)</td><td><input id="dn_o" type="number" inputmode="numeric" min="0" placeholder="0" oninput="cashCalc(${c.expected})"></td></tr></table>
- <div class="cards"><div class="kpi"><small>Total uang fisik</small><b id="cc_t">Rp0</b></div><div class="kpi"><small>Selisih</small><b id="cc_d"></b></div></div>
- <div class="mrow"><button class="btn" onclick="closeModal()">Batal</button><button class="btn bad" onclick="doCloseShift()">Tutup &amp; Cetak Z-Report</button></div>`,true);
+ ${CC()?`<label style="margin-top:10px">Total uang tunai di laci (Rp)</label>
+ <input id="cc_in" type="number" inputmode="numeric" min="0" placeholder="Isi jumlah uang tunai sekarang" style="font-size:20px;font-weight:700" oninput="cashCalc(${c.expected})">
+ <div class="cards"><div class="kpi"><small>Selisih dengan kas seharusnya</small><b id="cc_d">-</b></div></div>`
+ :`<div class="promo" style="margin-top:10px">Hitung uang kas nonaktif. Tutup kasir otomatis <b>PAS</b> (uang fisik dianggap ${rp(c.expected)}).</div>`}
+ <div class="mrow" style="position:sticky;bottom:0;background:var(--card);padding:10px 0 2px"><button class="btn" onclick="closeModal()">Batal</button><button class="btn bad" onclick="doCloseShift()">Tutup &amp; Cetak Z-Report</button></div>`,true);
  cashCalc(c.expected);
 }
 function cashCalc(exp){
- let t=0;document.querySelectorAll('.dn').forEach(i=>t+=(parseFloat(i.value)||0)*(+i.dataset.v));
- t+=parseFloat($('#dn_o').value)||0;window._cash=t;
- const d=t-exp;$('#cc_t').textContent=rp(t);
- const e=$('#cc_d');e.textContent=d===0?'PAS':d>0?'Lebih '+rp(d):'Minus '+rp(-d);e.style.color=d===0?'var(--ok)':d>0?'var(--warn)':'var(--bad)';
+ const i=$('#cc_in');if(!i)return;
+ const has=i.value.trim()!=='';window._cash=has?(parseFloat(i.value)||0):null;
+ const e=$('#cc_d');if(!has){e.textContent='-';e.style.color='';return}
+ const d=window._cash-exp;e.textContent=d===0?'PAS':d>0?'Lebih '+rp(d):'Minus '+rp(-d);e.style.color=d===0?'var(--ok)':d>0?'var(--warn)':'var(--bad)';
 }
 /* produk terjual pada satu shift (qty bersih setelah refund) */
 function shiftProd(sh){
@@ -1408,7 +1422,7 @@ function zText(sh){
  L.push(lr('Total diterima',num(sum(Object.keys(METHODS).filter(m=>m!=='komplimen'),m=>c.by[m]))),hr,'REFUND PER METODE');
  const anyR=Object.keys(METHODS).filter(m=>c.rby[m]);
  anyR.length?anyR.forEach(m=>L.push(lr(' '+METHODS[m],'-'+num(c.rby[m])))):L.push(' (tidak ada)');
- L.push(hr,lr('Tunai masuk',num(c.by.tunai)),lr('Refund tunai','-'+num(c.rby.tunai)),lr('Uang masuk lain','+'+num(c.cin)),lr('Pengeluaran kas','-'+num(c.cout)),lr('Kas seharusnya',num(c.expected)),lr('Uang fisik',num(sh.counted)),lr('Selisih',d===0?'PAS':(d>0?'LEBIH ':'MINUS ')+num(Math.abs(d))),hr);
+ L.push(hr,lr('Tunai masuk',num(c.by.tunai)),lr('Refund tunai','-'+num(c.rby.tunai)),lr('Uang masuk lain','+'+num(c.cin)),lr('Pengeluaran kas','-'+num(c.cout)),lr('Kas seharusnya',num(c.expected)),lr('Uang fisik',sh.auto?'otomatis':num(sh.counted)),lr('Selisih',d===0?'PAS':(d>0?'LEBIH ':'MINUS ')+num(Math.abs(d))),hr);
  const sp=shiftProd(sh);L.push('PENJUALAN PRODUK');
  sp.length?grpCat(Object.fromEntries(sp)).forEach(([c,x])=>{L.push('['+c.toUpperCase()+']');x.list.forEach(([n,o])=>{L.push(...f.wrap(n));L.push(lr('  '+fq(o.q)+' '+o.unit+' x',num(o.rev)))});L.push(lr(' Subtotal '+c,num(x.rev)))}):L.push(' (tidak ada)');
  L.push(hr,lr('Total item',fq(sum(sp,x=>x[1].q))),hr);
@@ -1416,12 +1430,13 @@ function zText(sh){
 }
 function doCloseShift(){
  const sh=S.shift,c=shiftCalc(sh);
- sh.closeTs=Date.now();sh.counted=window._cash||0;sh.expected=c.expected;sh.diff=sh.counted-c.expected;save();
+ if(CC()&&(window._cash==null||isNaN(window._cash))){toast('Isi total uang tunai di laci dulu');const i=$('#cc_in');if(i)i.focus();return}
+ sh.closeTs=Date.now();sh.auto=!CC();sh.counted=CC()?window._cash:c.expected;sh.expected=c.expected;sh.diff=sh.counted-c.expected;save();
  const z=zText(sh);window._rt=z;
  openModal(`<h3>Shift Ditutup</h3><pre class="rc">${esc(z)}</pre><div class="mrow"><button class="btn" onclick="printText(window._rt,'z')">${ic('printer',16)} Cetak Z-Report</button></div>
  <div class="mrow"><button class="btn pri" onclick="finishLock()">Absen Pulang &amp; Kunci Layar</button></div>`);
 }
-function finishLock(){closeModal();S.user=null;S.shift=null;resetCart();renderLock()}
+function finishLock(){closeModal();sessClear();S.user=null;S.shift=null;resetCart();renderLock()}
 
 /* ---------- laporan & excel ---------- */
 const R={p:'today',from:'',to:''};
@@ -1523,6 +1538,7 @@ function setModal(tab){
  if(tab==='outlet')body=card('Profil Toko','Tampil pada header dan footer struk · Versi aplikasi: sidebar-v5',`<div class="fg">${fld('Nama toko',`<input id="o_n" value="${esc(st.name)}">`)}${fld('No. WhatsApp',`<input id="o_w" value="${esc(st.wa)}">`)}${fld('Alamat',`<input id="o_a" value="${esc(st.address)}">`,1)}${fld('Catatan footer struk',`<input id="o_f" value="${esc(st.footer)}">`,1)}${fld('Ukuran kertas thermal',`<select id="o_p">${selOpt(st.paper,pp)}</select>`)}</div>`)+sv('saveOutlet()');
  if(tab==='pajak')body=card('Service Charge &amp; Pajak','Urutan hitung: subtotal − diskon → + service → + pajak',`<div class="fg">${fld('Service charge (%)',`<input id="t_sp" type="number" step="any" min="0" value="${st.servicePct}">`)}${fld('Service berlaku untuk',`<select id="t_sd">${selOpt(st.serviceDineOnly,[['true','Dine In saja'],['false','Semua order']])}</select>`)}${fld('Pajak / PPN (%)',`<input id="t_tp" type="number" step="any" min="0" value="${st.taxPct}">`)}${fld('Mode pajak',`<select id="t_tm">${selOpt(st.taxMode,[['excl','Ditambahkan ke total'],['incl','Sudah termasuk harga']])}</select>`)}</div>`)
   +card('Pembulatan','Pembulatan total pembayaran',`<div class="fg">${fld('Pembulatan ke',`<select id="t_ru">${selOpt(st.roundUnit,[[0,'Tanpa pembulatan'],[100,'Rp100'],[500,'Rp500'],[1000,'Rp1.000']])}</select>`)}${fld('Arah pembulatan',`<select id="t_rm">${selOpt(st.roundMode,[['nearest','Terdekat'],['up','Ke atas'],['down','Ke bawah']])}</select>`)}</div>`)
+  +card('Kas Kasir','Uang modal saat buka kasir dan hitung uang saat tutup kasir',fld('Hitung uang kas',`<select id="t_cc">${selOpt(CC(),[['true','Aktif: isi uang modal saat buka, isi total uang tunai saat tutup'],['false','Nonaktif: tanpa uang modal, tutup kasir otomatis PAS']])}</select>`,true)+fld('Login kasir',`<select id="t_lm">${selOpt(LM(),[['tutup','Tetap login sampai Tutup Kasir (tidak diminta PIN lagi walau aplikasi ditutup)'],['ganti','Boleh Ganti Kasir tanpa tutup kasir (shift tetap terbuka, penjualan terpisah per kasir)']])}</select>`,true))
   +card('Mode Meja','Denah meja dan pilihan meja di Detail Order',`${fld('Mode meja',`<select id="t_tb">${selOpt(st.tableMode,[['false','Nonaktif'],['true','Aktif — ada denah meja']])}</select>`)}${fld('Daftar meja (pisahkan dengan koma)',`<textarea id="t_tl" rows="3">${esc(st.tables.join(', '))}</textarea>`)}`)+sv('saveTax()');
  if(tab==='print'){const P=st.print,cats=[...new Set(db.products.map(x=>x.cat).filter(Boolean))];
   body=card('Struk Kasir','Struk pembayaran untuk pelanggan',`<div class="fg">${fld('Ukuran kertas',`<select id="p_rp">${selOpt(st.paper,pp)}</select>`)}${fld('Jumlah salinan',`<input id="p_rc" type="number" min="1" max="5" value="${P.receipt.copies}">`)}${fld('Cetak struk otomatis setelah bayar',`<select id="p_ra">${selOpt(P.receipt.auto,[[true,'Ya, langsung cetak'],[false,'Tidak, tampilkan dulu']])}</select>`,1)}</div>`)
@@ -1536,16 +1552,16 @@ function setModal(tab){
   +`<div class="mut" style="font-size:13px;margin:0 2px 16px">Sambungkan printer Bluetooth untuk Struk, Dapur, Bar, dan Checker di tab <b>Perangkat</b>. Bagian yang belum punya printer Bluetooth akan memakai dialog cetak browser.</div>`+sv('savePrint()');}
  if(tab==='perangkat'){const B=window.BT,ds=B?B.devices():[],desc={receipt:'Struk pembayaran dan Z-Report',kitchen:'Tiket pesanan untuk dapur',bar:'Tiket pesanan untuk bar',checker:'Daftar cek kelengkapan pesanan'};
   body=!B?card('Perangkat','',`<div class="mut">Modul printer belum siap.</div>`):`<div id="btPanel"></div>`
-  +(window.FS?card('Layar Penuh','Seperti menekan F11. Browser mewajibkan satu sentuhan/klik dulu, jadi layar penuh aktif saat pertama kali layar disentuh.',`<div class="fg">${fld('Otomatis layar penuh saat dibuka',`<select onchange="FS.setAuto(this.value==='true')">${selOpt(FS.auto(),[[true,'Ya'],[false,'Tidak']])}</select>`)}</div><button class="btn sm" onclick="FS.toggle()">Layar penuh / keluar</button>`):'')
-  +card('Relay LAN (opsional)','Hanya perlu jika ada printer LAN/WiFi. Jalankan relay-printer.js di PC atau mini PC yang satu jaringan dengan printer.',`<div class="fg">${fld('Alamat relay',`<input value="${esc(B.relay())}" placeholder="http://192.168.1.10:9101" onchange="BT.setRelay(this.value)">`,1)}</div><button class="btn sm" onclick="BT.ping()">Cek relay</button>`)
+  +(window.FS&&!(window.BT&&BT.native)?card('Layar Penuh','Seperti menekan F11. Browser mewajibkan satu sentuhan/klik dulu, jadi layar penuh aktif saat pertama kali layar disentuh.',`<div class="fg">${fld('Otomatis layar penuh saat dibuka',`<select onchange="FS.setAuto(this.value==='true')">${selOpt(FS.auto(),[[true,'Ya'],[false,'Tidak']])}</select>`)}</div><button class="btn sm" onclick="FS.toggle()">Layar penuh / keluar</button>`):'')
+  +(B.native?card('Mode Aplikasi','Kamu memakai aplikasi TWINS POS. Printer LAN dikirim langsung ke IP printer, dan printer Bluetooth yang sudah dipasangkan tersambung otomatis. Tidak perlu relay.',''):card('Relay LAN (opsional)','Hanya perlu jika ada printer LAN/WiFi. Jalankan relay-printer.js di PC atau mini PC yang satu jaringan dengan printer.',`<div class="fg">${fld('Alamat relay',`<input value="${esc(B.relay())}" placeholder="http://192.168.1.10:9101" onchange="BT.setRelay(this.value)">`,1)}</div><button class="btn sm" onclick="BT.ping()">Cek relay</button>`))
   +Object.keys(B.roles).map(r=>{const s=B.state(r),oth=ds.filter(d=>d.id!==s.id);
-   const badge=s.mode==='bt'?`<span class="badge ${s.on?'g':'v'}">${s.on?'Tersambung':s.name?'Terputus':'Belum diatur'}</span>`:s.mode==='lan'?`<span class="badge ${s.ip&&B.relay()?'g':'v'}">${s.ip&&B.relay()?'LAN':'Belum lengkap'}</span>`:`<span class="badge v">Browser</span>`;
+   const badge=s.mode==='bt'?`<span class="badge ${s.on?'g':'v'}">${s.on?'Tersambung':s.name?'Terputus':'Belum diatur'}</span>`:s.mode==='lan'?`<span class="badge ${s.ip&&(B.native||B.relay())?'g':'v'}">${s.ip&&(B.native||B.relay())?'LAN':'Belum lengkap'}</span>`:`<span class="badge v">Browser</span>`;
    const sub=s.mode==='bt'?(s.name?'Printer Bluetooth':'Belum ada printer dipilih'):s.mode==='lan'?(s.ip?esc(s.ip)+':'+s.port:'IP printer belum diisi'):'Memakai dialog cetak browser';
    const mode=`<div class="fg" style="margin-top:10px">${fld('Metode cetak',`<select onchange="BT.setMode('${r}',this.value)">${selOpt(s.mode,[['browser','Dialog cetak browser'],['bt','Bluetooth'],['lan','LAN / WiFi']])}</select>`)}</div>`;
    const inner=s.mode==='bt'?`<div class="quick" style="margin-top:10px"><button class="btn pri sm" onclick="BT.connect('${r}')">${s.name?'Ganti printer':'Pilih printer'}</button>${oth.map(d=>`<button class="btn sm" data-id="${esc(d.id)}" onclick="BT.use('${r}',this.dataset.id)">Pakai ${esc(d.name)}</button>`).join('')}<button class="btn sm" onclick="BT.test('${r}')">Tes cetak</button>${s.name?`<button class="btn sm bad" onclick="BT.clear('${r}')">Lepas</button>`:''}</div>`
     :s.mode==='lan'?`<div class="fg">${fld('IP printer',`<input value="${esc(s.ip)}" placeholder="192.168.1.50" onchange="BT.setLan('${r}','ip',this.value)">`)}${fld('Port',`<input type="number" value="${s.port}" onchange="BT.setLan('${r}','port',this.value)">`)}${fld('Potong kertas otomatis',`<select onchange="BT.setLan('${r}','cut',this.value==='true')">${selOpt(s.cut,[[true,'Ya'],[false,'Tidak']])}</select>`)}</div><div class="quick"><button class="btn sm" onclick="BT.test('${r}')">Tes cetak</button></div>`:'';
    return card(B.roles[r],desc[r],`<div class="lrow"><div class="avatar">${ic('printer',18)}</div><div class="lmain"><b>${s.mode==='bt'&&s.name?esc(s.name):'Metode: '+({browser:'Browser',bt:'Bluetooth',lan:'LAN / WiFi'}[s.mode])}</b><div class="mut">${sub}</div></div>${badge}</div>${mode}${inner}`)}).join('')
-  +`<div class="mut" style="font-size:13px;margin:0 2px 16px">Tiap bagian bebas memakai metode berbeda (misalnya Struk lewat Bluetooth, Dapur lewat LAN). Bluetooth: Chrome Android/komputer, printer BLE. LAN: perangkat kasir, relay, dan printer harus satu jaringan, dan printer sebaiknya diberi IP tetap. Jika cetak gagal, otomatis kembali ke dialog cetak browser.</div>`;
+  +`<div class="mut" style="font-size:13px;margin:0 2px 16px">Tiap bagian bebas memakai metode berbeda (misalnya Struk lewat Bluetooth, Dapur lewat LAN). Bluetooth (browser): Chrome Android/komputer, printer BLE; di aplikasi, semua printer Bluetooth yang sudah dipasangkan bisa dipakai. LAN: perangkat kasir, relay, dan printer harus satu jaringan, dan printer sebaiknya diberi IP tetap. Jika cetak gagal, otomatis kembali ke dialog cetak browser.</div>`;
  }
  if(tab==='biaya'){const F=feeCfg(),ms=['qris','debit','kredit','transfer','ewallet'];
   body=card('Biaya Metode Bayar (MDR)','Dipotong penyedia pembayaran dari uang yang diterima toko. Tagihan pelanggan tidak berubah, nilainya dicatat sebagai beban.',`<div class="fg">${ms.map(m=>fld(METHODS[m]+' · persen (%)',`<input id="f_m_${m}_p" type="number" step="any" min="0" value="${F.mdr[m].pct}">`)+fld(METHODS[m]+' · tambahan Rp per transaksi',`<input id="f_m_${m}_f" type="number" step="any" min="0" value="${F.mdr[m].flat}">`)).join('')}</div>`)
@@ -1589,7 +1605,7 @@ function saveKas(){const f=id=>[...new Set($('#'+id).value.split(',').map(x=>x.t
 function saveOutlet(){Object.assign(db.settings,{name:$('#o_n').value.trim()||'Toko',address:$('#o_a').value,wa:$('#o_w').value,footer:$('#o_f').value,paper:$('#o_p').value});save();toast('Profil tersimpan');setModal('outlet')}
 function saveTax(){
  const tl=$('#t_tl').value.split(',').map(x=>x.trim()).filter(Boolean);
- Object.assign(db.settings,{servicePct:Math.max(0,parseFloat($('#t_sp').value)||0),serviceDineOnly:$('#t_sd').value==='true',taxPct:Math.max(0,parseFloat($('#t_tp').value)||0),taxMode:$('#t_tm').value,roundUnit:+$('#t_ru').value,roundMode:$('#t_rm').value,tableMode:$('#t_tb').value==='true',tables:[...new Set(tl)]});
+ Object.assign(db.settings,{servicePct:Math.max(0,parseFloat($('#t_sp').value)||0),serviceDineOnly:$('#t_sd').value==='true',taxPct:Math.max(0,parseFloat($('#t_tp').value)||0),taxMode:$('#t_tm').value,roundUnit:+$('#t_ru').value,roundMode:$('#t_rm').value,tableMode:$('#t_tb').value==='true',cashCount:$('#t_cc').value==='true',loginMode:$('#t_lm').value,tables:[...new Set(tl)]});
  if(db.settings.tableMode&&!db.settings.tables.length)db.settings.tables=['Meja 1'];
  if(!db.settings.tableMode&&S.view==='tables')S.view='pos';
  save();toast('Tersimpan');setModal('pajak');
@@ -1891,14 +1907,17 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
  function setLan(r,k,v){const c=cfg.roles[r]=cfg.roles[r]||{};c[k]=k==='port'?(parseInt(v)||9100):k==='cut'?!!v:String(v).trim();saveCfg();refresh()}
  function setRelay(v){cfg.relay=String(v).trim();saveCfg();refresh()}
  const origPrint=printJobs;
- const isOn=id=>{const p=pool[id];return !!(p&&p.chr&&p.dev.gatt&&p.dev.gatt.connected)};
+ /* di dalam APK (Capacitor) cetak lewat jembatan native: LAN langsung ke IP:port, Bluetooth ke printer yang sudah dipasangkan */
+ const nat=()=>{try{const C=window.Capacitor;return C&&C.isNativePlatform&&C.isNativePlatform()&&C.Plugins&&C.Plugins.TwinsPrinter||null}catch(e){return null}};
+ if(nat())window.NATPRINT=()=>nat().systemPrint().catch(e=>toast('Cetak gagal: '+(e&&e.message||e)));
+ const isOn=id=>nat()?Object.keys(map).some(r=>map[r].id===id):!!(pool[id]&&pool[id].chr&&pool[id].dev.gatt&&pool[id].dev.gatt.connected);
  const btn=document.createElement('button');btn.id='btBtn';
  btn.style.cssText='position:fixed;left:12px;bottom:12px;z-index:9999;border:0;border-radius:99px;padding:12px 18px;font:600 14px sans-serif;background:#2457f5;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.3)';
  const paint=()=>{
   const rs=Object.keys(map),c=rs.filter(r=>isOn(map[r].id)).length;
   btn.textContent=rs.length?'🖨 Printer '+c+'/'+rs.length:'🖨 Atur Printer BT';
   const act=Object.keys(ROLES).filter(r=>modeOf(r)!=='browser');
-  const ok=act.filter(r=>modeOf(r)==='lan'?!!(cfg.relay&&(cfg.roles[r]||{}).ip):!!(map[r]&&isOn(map[r].id)));
+  const ok=act.filter(r=>modeOf(r)==='lan'?!!((nat()||cfg.relay)&&(cfg.roles[r]||{}).ip):!!(map[r]&&isOn(map[r].id)));
   const h=document.getElementById('prnSt');
   if(h){
    const cls=!act.length?'':ok.length===act.length?'g':ok.length?'o':'r';
@@ -1937,7 +1956,17 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
    if(!isOn(p.id))toast('Printer '+p.name+' terputus. Buka Pengaturan › Perangkat untuk sambung lagi.');
   });
  }
+ async function natConnect(role){
+  const P=nat();let r;
+  try{r=await P.btList()}catch(e){toast('Gagal membaca daftar printer: '+(e&&e.message||e));return}
+  const ds=(r&&r.devices)||[];
+  const rows=ds.map(d=>`<button class="btn" style="width:100%;justify-content:flex-start;margin:4px 0" data-a="${esc(d.address)}" data-n="${esc(d.name)}" onclick="BT.pick('${role}',this.dataset.a,this.dataset.n)">${esc(d.name)} <span class="mut" style="margin-left:8px">${esc(d.address)}</span></button>`).join('');
+  openModal(`<h3>Pilih printer untuk ${esc(ROLES[role])}</h3><div class="mut" style="margin-bottom:10px">Daftar printer yang sudah dipasangkan di Bluetooth HP ini.</div>${rows||'<div class="mut">Belum ada printer yang dipasangkan. Pasangkan printer dulu di pengaturan Bluetooth HP (PIN biasanya 0000 atau 1234), lalu kembali ke sini. Printer yang hanya mendukung BLE belum didukung di aplikasi.</div>'}<div class="mrow"><button class="btn" onclick="BT.openBt()">Buka pengaturan Bluetooth</button><button class="btn" onclick="closeModal()">Tutup</button></div>`);
+ }
+ function pick(role,address,name){map[role]={id:address,name:name||'Printer'};saveMap();closeModal();toast(ROLES[role]+' → '+(name||address));refresh()}
+ function openBt(){try{nat().openBtSettings()}catch(e){}}
  async function connect(role){
+  if(nat())return natConnect(role);
   if(!navigator.bluetooth){toast('Browser ini tidak mendukung Bluetooth. Pakai Chrome Android/komputer.');return}
   let dev;
   try{dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:SERVICES})}
@@ -1958,6 +1987,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
  const devices=()=>Object.values(pool).map(p=>({id:p.id,name:p.name,on:isOn(p.id)}));
  async function ensure(role){
   const m=map[role];if(!m)return false;
+  if(nat())return true;
   const p=pool[m.id];if(!p)return false;
   if(isOn(m.id))return true;
   try{p.manual=false;await link(p);refresh();return true}catch(e){return false}
@@ -1986,6 +2016,13 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
   }
  }
  async function sendText(role,txt,copies){
+  if(nat()){
+   const body=enc.encode(clean(txt)+'\n\n\n\n'),one=new Uint8Array(2+body.length);
+   one.set([0x1B,0x40],0);one.set(body,2);
+   const all=new Uint8Array(one.length*copies);for(let k=0;k<copies;k++)all.set(one,k*one.length);
+   await nat().btSend({address:map[role].id,data:b64(all)});
+   return;
+  }
   const p=pool[map[role].id];
   const body=enc.encode(clean(txt)+'\n\n\n\n');
   const all=new Uint8Array(2+body.length);
@@ -2001,8 +2038,13 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
  const relayURL=()=>cfg.relay.replace(/\/+$/,'');
  async function lanSend(role,txt,copies){
   const c=cfg.roles[role]||{};
-  if(!cfg.relay)throw new Error('alamat relay belum diisi');
   if(!c.ip)throw new Error('IP printer belum diisi');
+  if(nat()){
+   try{await nat().tcpSend({ip:c.ip,port:+c.port||9100,data:b64(makeBytes(txt,copies,c.cut!==false))})}
+   catch(e){throw new Error((e&&e.message)||'printer tidak terjangkau (cek IP dan jaringan)')}
+   return;
+  }
+  if(!cfg.relay)throw new Error('alamat relay belum diisi');
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),9000);
   try{
    const r=await fetch(relayURL()+'/print',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({ip:c.ip,port:+c.port||9100,data:b64(makeBytes(txt,copies,c.cut!==false))}),signal:ctl.signal});
@@ -2042,16 +2084,17 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
   if(!(await ensure(role))){toast('Printer '+ROLES[role]+' belum tersambung. Pilih printer dulu.');return}
   try{await sendText(role,txt,1);toast('Tes terkirim ke '+map[role].name)}catch(e){toast('Tes gagal: '+e.message)}
  }
- window.BT={paint,roles:ROLES,state,devices,connect,use,clear,test,setMode,setLan,setRelay,ping,relay:()=>cfg.relay};
+ window.BT={paint,roles:ROLES,state,devices,connect,use,clear,test,setMode,setLan,setRelay,ping,relay:()=>cfg.relay,pick,openBt,native:!!nat()};
 })();
 
 /* layar penuh */
 (function(){
  const K='twinspos_fs',el=document.documentElement;
- const auto=()=>{try{return localStorage.getItem(K)!=='0'}catch(e){return true}};
+ const NATV=()=>{try{const C=window.Capacitor;return !!(C&&C.isNativePlatform&&C.isNativePlatform())}catch(e){return false}};
+ const auto=()=>{if(NATV())return false;try{return localStorage.getItem(K)!=='0'}catch(e){return true}};
  const isFs=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
  let entered=false,warned=false;
- const fail=m=>{if(warned)return;warned=true;toast('Layar penuh ditolak browser'+(m?': '+m:'')+'. Coba buka lewat Chrome.')};
+ const fail=m=>{if(warned||NATV())return;warned=true;toast('Layar penuh ditolak browser'+(m?': '+m:'')+'. Coba buka lewat Chrome.')};
  const enter=()=>{
   const f=el.requestFullscreen||el.webkitRequestFullscreen;
   if(!f){fail('tidak didukung');return false}
@@ -2185,7 +2228,10 @@ if(window.PL)PL.init({
  export:(n,r)=>exportX(n,[{name:n.slice(0,31),rows:r}]),
  openTx:id=>{const t=db.tx.find(x=>x.id===id);if(t)receiptModal(t)}
 });
-renderApp();
+(async()=>{
+ try{const n=NAT0();if(n){let ok=false;try{const li=await n.launchInfo();ok=!!(li&&li.restored)}catch(e){ok=false}if(!ok)sessClear()}}catch(e){}
+ renderApp();
+})();
 </script>
 <script>if("serviceWorker" in navigator&&location.protocol==="https:"){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}</script>
 </body>
