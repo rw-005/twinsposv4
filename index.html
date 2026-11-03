@@ -2260,14 +2260,33 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAuto()
 /* tombol kembali (UI + tombol back bawaan HP) */
 function goBack(){nav('pos')}
 (function(){
- const push=()=>{try{history.pushState({tp:1},'')}catch(e){}};
- try{history.replaceState({tp:0},'');push()}catch(e){}
- window.addEventListener('popstate',()=>{
-  push();
+ /* Chrome/WebView melewati entri riwayat yang dibuat tanpa sentuhan pengguna, jadi
+    'penjaga' riwayat dipasang ulang di setiap sentuhan supaya tombol back tidak keluar aplikasi */
+ const guard=()=>{try{if(!history.state||history.state.tp!==1)history.pushState({tp:1},'')}catch(e){}};
+ try{history.replaceState({tp:0},'');history.pushState({tp:1},'')}catch(e){}
+ ['pointerdown','touchstart','click','keydown'].forEach(t=>document.addEventListener(t,guard,true));
+ let lastBack=0;
+ /* true = sudah ditangani di dalam aplikasi */
+ const act=()=>{
   const m=$('#modal');
-  if(m&&m.classList.contains('on')){S.user?closeSet():closeModal();return}
-  if(S.user&&S.view!=='pos')nav('pos');
+  if(m&&m.classList.contains('on')){S.user?closeSet():closeModal();return true}
+  if(S.user&&S.view!=='pos'){nav('pos');return true}
+  return false;
+ };
+ window.addEventListener('popstate',()=>{
+  try{history.pushState({tp:1},'')}catch(e){}
+  act();
  });
+ /* APK (Capacitor): tombol back bawaan Android */
+ try{
+  const A=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+  if(A&&A.addListener)A.addListener('backButton',()=>{
+   if(act())return;
+   const n=Date.now();
+   if(n-lastBack<2000){try{A.exitApp()}catch(e){}return}
+   lastBack=n;toast('Tekan back sekali lagi untuk keluar');
+  });
+ }catch(e){}
 })();
 /* ===== Varian & Topping (maks. MAXOPT per produk) ===== */
 const MAXOPT=20;
