@@ -929,6 +929,17 @@ function custModal(){
 /* ---------- Dilayani oleh (karyawan dari Backoffice) ---------- */
 /* ---------- Kunci fitur per klien (data master di Google Sheet milik admin, dicocokkan dengan hash URL script klien) ---------- */
 const MASTER_URL=(window.TWINS_CFG&&window.TWINS_CFG.master)||'';   // diisi lewat config.js (jangan ubah di sini)
+async function kodeToko(kode,app){
+ if(!MASTER_URL||/TEMPEL/.test(MASTER_URL)){const e=new Error('Kode Toko belum bisa dipakai di aplikasi ini. Hubungi TWINS POS.');e.rej=true;throw e}
+ const c=new AbortController(),t=setTimeout(()=>c.abort(),12000);
+ try{
+  const r=await fetch(MASTER_URL+(MASTER_URL.includes('?')?'&':'?')+'aksi=toko&app='+app+'&kode='+encodeURIComponent(kode),{redirect:'follow',signal:c.signal});
+  const j=await r.json();
+  if(!j.ok){const e=new Error(j.err||'Kode Toko tidak ditemukan');e.rej=true;throw e}
+  return j;
+ }catch(e){if(e.rej)throw e;throw new Error(e.name==='AbortError'?'Server tidak merespons':'Tidak bisa terhubung ke server')}
+ finally{clearTimeout(t)}
+}
 const FT={on:new Set(),code:'',wa:'',msg:'',nama:'',exp:false};
 const hasF=k=>FT.on.has(k);
 async function urlCode(u){try{const n=String(u||'').trim().split('?')[0].replace(/\/+$/,'').toLowerCase();if(!n||!(window.crypto&&crypto.subtle))return'';const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(n));return[...new Uint8Array(b)].slice(0,6).map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return''}}
@@ -2004,13 +2015,21 @@ async function repRefresh(btn){
  repModal();
 }
 function syncCard(){
- return card('Koneksi Google Sheet','Isi URL Web App dan token sekali saja. Proses sinkron ada di menu Sinkronisasi.',
- `<div class="fg">${fld('URL Web App (Apps Script)',`<input id="sy_u" value="${esc(SY.url||'')}" placeholder="https://script.google.com/macros/s/.../exec">`,1)}${fld('Token rahasia (sama dengan di Code.gs)',`<input id="sy_t" value="${esc(SY.token||'')}">`,1)}</div>
+ const man=!!(SY.url&&!SY.kode);   // pengaturan lama (URL & token manual) tetap tampil terbuka
+ return card('Koneksi Online','Isi Kode Toko dari TWINS POS sekali saja. Proses sinkron ada di menu Sinkronisasi.',
+ `<div class="fg">${fld('Kode Toko',`<input id="sy_k" inputmode="numeric" maxlength="6" autocomplete="off" value="${esc(SY.kode||'')}" placeholder="6 digit dari TWINS POS">`,1)}</div>
+ <details ${man?'open':''} style="margin:8px 0"><summary class="mut" style="cursor:pointer;font-size:13px">Pengaturan manual (URL dan token)</summary><div class="fg" style="margin-top:8px">${fld('URL Web App',`<input id="sy_u" value="${esc(SY.kode?'':(SY.url||''))}" placeholder="https://script.google.com/macros/s/.../exec">`,1)}${fld('Token',`<input id="sy_t" value="${esc(SY.kode?'':(SY.token||''))}">`,1)}</div></details>
  <div class="mut" style="font-size:12px">Versi sinkron produk: v3</div><div id="sy_st" class="mut" style="margin:10px 0;font-size:13.5px">${esc(SY.msg||(syOn()?'Aktif':'Belum diatur — data hanya tersimpan di perangkat ini'))}</div>
  <div class="quick"><button class="btn pri" onclick="saveSync()">Simpan &amp; Tes Koneksi</button><button class="btn" onclick="setModal('sinkron')">Buka Sinkronisasi</button></div>`);
 }
 async function saveSync(){
- SY.url=$('#sy_u').value.trim();SY.token=$('#sy_t').value.trim();sySave();
+ const kk=($('#sy_k').value||'').trim();
+ if(kk){
+  if(!/^\d{6}$/.test(kk)){syStatus('Kode Toko harus 6 digit angka',true);return}
+  syStatus('Memeriksa Kode Toko…');
+  try{const r=await kodeToko(kk,'pos');SY.url=r.url;SY.token=r.token||'';SY.kode=kk;sySave()}
+  catch(e){syStatus('Kode Toko gagal: '+e.message,true);return}
+ }else{SY.url=$('#sy_u').value.trim();SY.token=$('#sy_t').value.trim();SY.kode='';sySave()}
  if(!syOn()){syStatus('Dinonaktifkan');return}
  syStatus('Menguji koneksi…');
  try{
